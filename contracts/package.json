@@ -1,0 +1,41 @@
+{
+  "name": "x402-payment-router-contracts",
+  "version": "1.0.0",
+  "description": "Multi-chain payment router smart contracts for x402 protocol",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:base": "hardhat run scripts/deploy.js --network baseSepolia",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:arbitrum": "hardhat run scripts/deploy.js --network arbitrumSepolia",
+    "deploy:optimism": "hardhat run scripts/deploy.js --network optimismSepolia",
+    "deploy:all": "npm run deploy:base && npm run deploy:sepolia && npm run deploy:arbitrum && npm run deploy:optimism",
+    "deploy:tokens:base": "hardhat run scripts/deployTokens.js --network baseSepolia",
+    "deploy:tokens:sepolia": "hardhat run scripts/deployTokens.js --network sepolia",
+    "deploy:tokens:arbitrum": "hardhat run scripts/deployTokens.js --network arbitrumSepolia",
+    "deploy:tokens:optimism": "hardhat run scripts/deployTokens.js --network optimismSepolia",
+    "deploy:tokens:all": "npm run deploy:tokens:base && npm run deploy:tokens:sepolia && npm run deploy:tokens:arbitrum && npm run deploy:tokens:optimism",
+    "verify:base": "hardhat verify --network baseSepolia",
+    "verify:sepolia": "hardhat verify --network sepolia",
+    "verify:arbitrum": "hardhat verify --network arbitrumSepolia",
+    "verify:optimism": "hardhat verify --network optimismSepolia"
+  },
+  "keywords": [
+    "x402",
+    "payment",
+    "router",
+    "multi-chain",
+    "ethereum",
+    "solidity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.4"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.1",
+    "dotenv": "^16.3.1"
+  }
+}
