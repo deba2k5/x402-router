@@ -41,10 +41,10 @@ const CHAIN_CONFIGS: Record<string, ChainConfig> = {
     chainId: 84532,
     name: "Base Sepolia",
     rpcUrl: process.env.BASE_SEPOLIA_RPC || "https://sepolia.base.org",
-    routerAddress: (process.env.BASE_SEPOLIA_ROUTER || "0x0000000000000000000000000000000000000000") as Address,
+    routerAddress: (process.env.BASE_SEPOLIA_ROUTER || "0xC858560Ac08048258e57a1c6C47dAf682fC25F62") as Address,
     supportedTokens: [
-      { symbol: "USDC", address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address, decimals: 6 },
-      { symbol: "DAI", address: "0x7683022d84F726a96c4A6611cD31DBf5409c0Ac9" as Address, decimals: 18 },
+      { symbol: "USDC", address: "0x2b23c6e36b46cC013158Bc2869D686023FA85422" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0x6eb198E04d9a6844F74FC099d35b292127656A3F" as Address, decimals: 18 },
     ],
     chain: baseSepolia,
   },
@@ -52,9 +52,10 @@ const CHAIN_CONFIGS: Record<string, ChainConfig> = {
     chainId: 11155111,
     name: "Sepolia",
     rpcUrl: process.env.SEPOLIA_RPC || "https://rpc.sepolia.org",
-    routerAddress: (process.env.SEPOLIA_ROUTER || "0x0000000000000000000000000000000000000000") as Address,
+    routerAddress: (process.env.SEPOLIA_ROUTER || "0x0E8b303b5245f7ba924Aadf5828226c7d35e3e13") as Address,
     supportedTokens: [
-      { symbol: "USDC", address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as Address, decimals: 6 },
+      { symbol: "USDC", address: "0xc505D038fe2901fe624E6450887373BaA29e455F" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0x1c7A8CA39057C856c512f45eBAADfBc276D6ad77" as Address, decimals: 18 },
     ],
     chain: sepolia,
   },
@@ -62,9 +63,10 @@ const CHAIN_CONFIGS: Record<string, ChainConfig> = {
     chainId: 421614,
     name: "Arbitrum Sepolia",
     rpcUrl: process.env.ARBITRUM_SEPOLIA_RPC || "https://sepolia-rollup.arbitrum.io/rpc",
-    routerAddress: (process.env.ARBITRUM_SEPOLIA_ROUTER || "0x0000000000000000000000000000000000000000") as Address,
+    routerAddress: (process.env.ARBITRUM_SEPOLIA_ROUTER || "0x404A674a52f85789a71D530af705f2f458bc5284") as Address,
     supportedTokens: [
-      { symbol: "USDC", address: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d" as Address, decimals: 6 },
+      { symbol: "USDC", address: "0x7b926C6038a23c3E26F7f36DcBec7606BAF44434" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0xeeC4119F3B69A61744073BdaEd83421F4b29961E" as Address, decimals: 18 },
     ],
     chain: arbitrumSepolia,
   },
@@ -72,9 +74,10 @@ const CHAIN_CONFIGS: Record<string, ChainConfig> = {
     chainId: 11155420,
     name: "Optimism Sepolia",
     rpcUrl: process.env.OPTIMISM_SEPOLIA_RPC || "https://sepolia.optimism.io",
-    routerAddress: (process.env.OPTIMISM_SEPOLIA_ROUTER || "0x0000000000000000000000000000000000000000") as Address,
+    routerAddress: (process.env.OPTIMISM_SEPOLIA_ROUTER || "0xC49568398F909aF8D40Cf27B26780e1B5Ca5996F") as Address,
     supportedTokens: [
-      { symbol: "USDC", address: "0x5fd84259d66Cd46123540766Be93DFE6D43130D7" as Address, decimals: 6 },
+      { symbol: "USDC", address: "0x281Ae468d00040BCbB4685972F51f87d473420F7" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0x7b926C6038a23c3E26F7f36DcBec7606BAF44434" as Address, decimals: 18 },
     ],
     chain: optimismSepolia,
   },
@@ -116,13 +119,6 @@ const PAYMENT_ROUTER_ABI = [
       },
     ],
     outputs: [],
-  },
-  {
-    name: "isPaymentProcessed",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "paymentId", type: "bytes32" }],
-    outputs: [{ name: "", type: "bool" }],
   },
   {
     name: "RouteExecuted",
@@ -360,18 +356,6 @@ const executeRouteOnChain = async (
       dexRouter: (payload.payload.route.dexRouter || "0x0000000000000000000000000000000000000000") as Address,
       dexCalldata: (payload.payload.route.dexCalldata || "0x") as Hex,
     };
-
-    // Check if payment already processed
-    const isProcessed = await publicClient.readContract({
-      address: chainConfig.routerAddress,
-      abi: PAYMENT_ROUTER_ABI,
-      functionName: "isPaymentProcessed",
-      args: [route.paymentId],
-    });
-
-    if (isProcessed) {
-      return { success: false, error: "Payment already processed" };
-    }
 
     // Execute the route
     const txHash = await walletClient.writeContract({

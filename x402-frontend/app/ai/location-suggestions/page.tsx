@@ -9,13 +9,38 @@ import { type Address } from "viem";
 
 const FACILITATOR_URL = "http://localhost:3000";
 const BACKEND_URL = "http://localhost:3001";
+const RELAYER_ADDRESS = "0x95Cf028D5e86863570E300CAD14484Dc2068eB79" as Address;
 
-// Chain configurations
-const CHAIN_CONFIGS: Record<string, { chainId: number; name: string; chain: any; usdc: Address }> = {
-  "base-sepolia": { chainId: 84532, name: "Base Sepolia", chain: baseSepolia, usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address },
-  "sepolia": { chainId: 11155111, name: "Sepolia", chain: sepolia, usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as Address },
-  "arbitrum-sepolia": { chainId: 421614, name: "Arbitrum Sepolia", chain: arbitrumSepolia, usdc: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d" as Address },
-  "optimism-sepolia": { chainId: 11155420, name: "Optimism Sepolia", chain: optimismSepolia, usdc: "0x5fd84259d66Cd46123540766Be93DFE6D43130D7" as Address },
+// Chain configurations with deployed PaymentRouter and token addresses
+const CHAIN_CONFIGS: Record<string, { chainId: number; name: string; chain: any; paymentRouter: Address; usdc: Address }> = {
+  "base-sepolia": { 
+    chainId: 84532, 
+    name: "Base Sepolia", 
+    chain: baseSepolia, 
+    paymentRouter: "0x12B57C8615aD34469e1388F1CEb700F8f416BC80" as Address,
+    usdc: "0x2b23c6e36b46cC013158Bc2869D686023FA85422" as Address 
+  },
+  "sepolia": { 
+    chainId: 11155111, 
+    name: "Sepolia", 
+    chain: sepolia, 
+    paymentRouter: "0xAf83302a062bDEfC42e12d09E7Dd3e4374998F70" as Address,
+    usdc: "0xc505D038fe2901fe624E6450887373BaA29e455F" as Address 
+  },
+  "arbitrum-sepolia": { 
+    chainId: 421614, 
+    name: "Arbitrum Sepolia", 
+    chain: arbitrumSepolia, 
+    paymentRouter: "0xC49568398F909aF8D40Cf27B26780e1B5Ca5996F" as Address,
+    usdc: "0x7b926C6038a23c3E26F7f36DcBec7606BAF44434" as Address 
+  },
+  "optimism-sepolia": { 
+    chainId: 11155420, 
+    name: "Optimism Sepolia", 
+    chain: optimismSepolia, 
+    paymentRouter: "0xeeC4119F3B69A61744073BdaEd83421F4b29961E" as Address,
+    usdc: "0x281Ae468d00040BCbB4685972F51f87d473420F7" as Address 
+  },
 };
 
 type LogEntry = { timestamp: Date; type: "info" | "success" | "error" | "pending"; message: string };
@@ -92,7 +117,7 @@ export default function LocationSuggestionsPage() {
       const paymentId = generatePaymentId();
       const amount = "500000"; // 0.5 USDC
       const deadline = Math.floor(Date.now() / 1000) + 3600;
-      const merchantAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0Ab0b";
+      const paymentRouterAddress = networkConfig.paymentRouter; // Spender in permit
 
       addLog("info", `Starting X402 Payment Flow`);
       addLog("info", `Network: ${networkConfig.name}`);
@@ -109,7 +134,7 @@ export default function LocationSuggestionsPage() {
       addLog("pending", "Requesting signature...");
 
       const permitDomain = {
-        name: "USDC",
+        name: "Mock USDC",
         version: "1",
         chainId: BigInt(networkConfig.chainId),
         verifyingContract: networkConfig.usdc,
@@ -127,7 +152,7 @@ export default function LocationSuggestionsPage() {
 
       const permitMessage = {
         owner: address,
-        spender: merchantAddress as Address,
+        spender: paymentRouterAddress as Address,
         value: BigInt(amount),
         nonce: BigInt(0),
         deadline: BigInt(deadline),
@@ -169,7 +194,7 @@ export default function LocationSuggestionsPage() {
             tokenOut: "",
             amountIn: amount,
             minAmountOut: amount,
-            merchant: merchantAddress,
+            merchant: RELAYER_ADDRESS,
             dexRouter: "",
             dexCalldata: "",
           },

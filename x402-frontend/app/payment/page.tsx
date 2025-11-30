@@ -7,39 +7,48 @@ import { useAccount, useChainId, useSwitchChain, useSignTypedData } from "wagmi"
 import { baseSepolia, sepolia, arbitrumSepolia, optimismSepolia } from "viem/chains";
 import { parseUnits, type Address } from "viem";
 
-// Chain configurations matching the facilitator
+const RELAYER_ADDRESS = "0x95Cf028D5e86863570E300CAD14484Dc2068eB79" as Address;
+
+// Chain configurations matching the facilitator with PaymentRouter addresses
 const CHAIN_CONFIGS = {
   "base-sepolia": {
     chainId: 84532,
     name: "Base Sepolia",
     chain: baseSepolia,
+    paymentRouter: "0x12B57C8615aD34469e1388F1CEb700F8f416BC80" as Address,
     tokens: [
-      { symbol: "USDC", address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address, decimals: 6 },
-      { symbol: "DAI", address: "0x7683022d84F726a96c4A6611cD31DBf5409c0Ac9" as Address, decimals: 18 },
+      { symbol: "USDC", address: "0x2b23c6e36b46cC013158Bc2869D686023FA85422" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0x6eb198E04d9a6844F74FC099d35b292127656A3F" as Address, decimals: 18 },
     ],
   },
   sepolia: {
     chainId: 11155111,
     name: "Sepolia",
     chain: sepolia,
+    paymentRouter: "0xAf83302a062bDEfC42e12d09E7Dd3e4374998F70" as Address,
     tokens: [
-      { symbol: "USDC", address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as Address, decimals: 6 },
+      { symbol: "USDC", address: "0xc505D038fe2901fe624E6450887373BaA29e455F" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0x1c7A8CA39057C856c512f45eBAADfBc276D6ad77" as Address, decimals: 18 },
     ],
   },
   "arbitrum-sepolia": {
     chainId: 421614,
     name: "Arbitrum Sepolia",
     chain: arbitrumSepolia,
+    paymentRouter: "0xC49568398F909aF8D40Cf27B26780e1B5Ca5996F" as Address,
     tokens: [
-      { symbol: "USDC", address: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d" as Address, decimals: 6 },
+      { symbol: "USDC", address: "0x7b926C6038a23c3E26F7f36DcBec7606BAF44434" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0xeeC4119F3B69A61744073BdaEd83421F4b29961E" as Address, decimals: 18 },
     ],
   },
   "optimism-sepolia": {
     chainId: 11155420,
     name: "Optimism Sepolia",
     chain: optimismSepolia,
+    paymentRouter: "0xeeC4119F3B69A61744073BdaEd83421F4b29961E" as Address,
     tokens: [
-      { symbol: "USDC", address: "0x5fd84259d66Cd46123540766Be93DFE6D43130D7" as Address, decimals: 6 },
+      { symbol: "USDC", address: "0x281Ae468d00040BCbB4685972F51f87d473420F7" as Address, decimals: 6 },
+      { symbol: "DAI", address: "0x7b926C6038a23c3E26F7f36DcBec7606BAF44434" as Address, decimals: 18 },
     ],
   },
 };
@@ -60,15 +69,16 @@ export default function PaymentPage() {
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkKey>("base-sepolia");
   const [selectedToken, setSelectedToken] = useState(CHAIN_CONFIGS["base-sepolia"].tokens[0]);
   const [amount, setAmount] = useState("1");
-  const [merchantAddress, setMerchantAddress] = useState("0x742d35Cc6634C0532925a3b844Bc9e7595f0Ab0b");
+  const [paymentRouterAddress, setPaymentRouterAddress] = useState(CHAIN_CONFIGS["base-sepolia"].paymentRouter);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [paymentResult, setPaymentResult] = useState<any>(null);
 
-  // Update token when network changes
+  // Update token and payment router when network changes
   useEffect(() => {
     const networkConfig = CHAIN_CONFIGS[selectedNetwork];
     setSelectedToken(networkConfig.tokens[0]);
+    setPaymentRouterAddress(networkConfig.paymentRouter);
   }, [selectedNetwork]);
 
   const addLog = (type: LogEntry["type"], message: string) => {
@@ -127,7 +137,7 @@ export default function PaymentPage() {
       addLog("pending", "Requesting permit signature...");
 
       const permitDomain = {
-        name: selectedToken.symbol,
+        name: "Mock USDC",
         version: "1",
         chainId: BigInt(networkConfig.chainId),
         verifyingContract: selectedToken.address,
@@ -145,7 +155,7 @@ export default function PaymentPage() {
 
       const permitMessage = {
         owner: address,
-        spender: merchantAddress as Address, // Router contract would be spender in production
+        spender: paymentRouterAddress as Address, // Router contract as spender in permit
         value: amountInWei,
         nonce: BigInt(0), // In production, fetch actual nonce from contract
         deadline: BigInt(deadline),
@@ -187,7 +197,7 @@ export default function PaymentPage() {
             tokenOut: "", // Same token, no swap
             amountIn: amountInWei.toString(),
             minAmountOut: amountInWei.toString(),
-            merchant: merchantAddress,
+            merchant: RELAYER_ADDRESS,
             dexRouter: "",
             dexCalldata: "",
           },
@@ -200,7 +210,7 @@ export default function PaymentPage() {
         maxAmountRequired: amountInWei.toString(),
         resource: "/api/ai/image-generation",
         description: "AI Image Generation Service",
-        payTo: merchantAddress,
+        payTo: RELAYER_ADDRESS,
         asset: selectedToken.address,
       };
 
@@ -347,15 +357,15 @@ export default function PaymentPage() {
                 </div>
               </div>
 
-              {/* Merchant Address */}
+              {/* Payment Router Address */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Merchant Address
+                  PaymentRouter Address (Spender)
                 </label>
                 <input
                   type="text"
-                  value={merchantAddress}
-                  onChange={(e) => setMerchantAddress(e.target.value)}
+                  value={paymentRouterAddress}
+                  onChange={(e) => setPaymentRouterAddress(e.target.value as Address)}
                   placeholder="0x..."
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white font-mono text-sm"
                 />

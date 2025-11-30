@@ -20,9 +20,6 @@ contract PaymentRouter is ReentrancyGuard, Pausable, Ownable {
     /// @notice Authorized relayer address that can execute routes
     address public relayer;
     
-    /// @notice Mapping to track processed payment IDs (prevent replay attacks)
-    mapping(bytes32 => bool) public processedPayments;
-    
     // ============ Structs ============
     
     /**
@@ -99,7 +96,6 @@ contract PaymentRouter is ReentrancyGuard, Pausable, Ownable {
     // ============ Errors ============
     
     error UnauthorizedRelayer();
-    error PaymentAlreadyProcessed();
     error InvalidAmount();
     error SlippageExceeded();
     error SwapFailed();
@@ -140,28 +136,20 @@ contract PaymentRouter is ReentrancyGuard, Pausable, Ownable {
         PermitData calldata permit,
         RouteParams calldata route
     ) external nonReentrant whenNotPaused onlyRelayer {
-        // 1. Validate payment hasn't been processed
-        if (processedPayments[route.paymentId]) {
-            revert PaymentAlreadyProcessed();
-        }
-        
-        // 2. Validate amounts
+        // 1. Validate amounts
         if (route.amountIn == 0 || route.minAmountOut == 0) {
             revert InvalidAmount();
         }
         
-        // 3. Validate permit deadline
+        // 2. Validate permit deadline
         if (block.timestamp > permit.deadline) {
             revert DeadlineExpired();
         }
         
-        // 4. Mark payment as processed (prevent replay)
-        processedPayments[route.paymentId] = true;
-        
-        // 5. Execute permit to approve token transfer
+        // 3. Execute permit to approve token transfer
         _executePermit(permit);
         
-        // 6. Pull tokens from payer
+        // 4. Pull tokens from payer
         bool success = IERC20(route.tokenIn).transferFrom(
             permit.owner,
             address(this),
@@ -171,7 +159,7 @@ contract PaymentRouter is ReentrancyGuard, Pausable, Ownable {
         
         uint256 amountOut;
         
-        // 7. Execute swap if needed (tokenOut != address(0) and dexRouter provided)
+        // 5. Execute swap if needed (tokenOut != address(0) and dexRouter provided)
         if (route.tokenOut != address(0) && route.dexRouter != address(0)) {
             amountOut = _executeSwap(route);
         } else {
@@ -179,17 +167,17 @@ contract PaymentRouter is ReentrancyGuard, Pausable, Ownable {
             amountOut = route.amountIn;
         }
         
-        // 8. Validate slippage protection
+        // 6. Validate slippage protection
         if (amountOut < route.minAmountOut) {
             revert SlippageExceeded();
         }
         
-        // 9. Transfer final tokens to merchant
+        // 7. Transfer final tokens to merchant
         address finalToken = route.tokenOut != address(0) ? route.tokenOut : route.tokenIn;
         success = IERC20(finalToken).transfer(route.merchant, amountOut);
         if (!success) revert TransferFailed();
         
-        // 10. Emit event for backend confirmation
+        // 8. Emit event for backend confirmation
         emit RouteExecuted(
             route.paymentId,
             permit.owner,
@@ -288,12 +276,5 @@ contract PaymentRouter is ReentrancyGuard, Pausable, Ownable {
         if (!success) revert TransferFailed();
     }
     
-    /**
-     * @notice Check if a payment has been processed
-     * @param paymentId Payment identifier to check
-     * @return bool True if payment has been processed
-     */
-    function isPaymentProcessed(bytes32 paymentId) external view returns (bool) {
-        return processedPayments[paymentId];
-    }
+
 }

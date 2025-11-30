@@ -8,7 +8,17 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const FACILITATOR_URL = process.env.FACILITATOR_URL || 'http://localhost:3000';
-const MERCHANT_ADDRESS = process.env.MERCHANT_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0Ab0b';
+
+// Relayer address that receives payments
+const RELAYER_ADDRESS = process.env.MERCHANT_ADDRESS || '0x95Cf028D5e86863570E300CAD14484Dc2068eB79';
+
+// PaymentRouter contract addresses for each network
+const PAYMENT_ROUTER_ADDRESSES = {
+  84532: '0xC858560Ac08048258e57a1c6C47dAf682fC25F62',        // Base Sepolia
+  11155111: '0x0E8b303b5245f7ba924Aadf5828226c7d35e3e13',    // Ethereum Sepolia
+  421614: '0x404A674a52f85789a71D530af705f2f458bc5284',      // Arbitrum Sepolia
+  11155420: '0xC49568398F909aF8D40Cf27B26780e1B5Ca5996F',    // Optimism Sepolia
+};
 
 // Middleware
 app.use(cors());
@@ -53,7 +63,7 @@ const generatePaymentRequirements = (service, resource) => {
     maxAmountRequired: config.price,
     resource: resource,
     description: config.description,
-    payTo: MERCHANT_ADDRESS,
+    payTo: RELAYER_ADDRESS,
     asset: config.asset,
     supportedAssets: Object.entries(SUPPORTED_CHAINS).map(([network, info]) => ({
       network,
@@ -76,7 +86,7 @@ const requirePayment = (service) => async (req, res, next) => {
   // If no payment header, return 402 Payment Required
   if (!xPayment) {
     const paymentRequirements = generatePaymentRequirements(service, req.originalUrl);
-    
+
     return res.status(402).json({
       error: 'Payment Required',
       message: 'This is a premium API endpoint. Please complete payment to access.',
@@ -97,6 +107,13 @@ const requirePayment = (service) => async (req, res, next) => {
     } catch {
       paymentPayload = JSON.parse(xPayment);
     }
+
+    console.log(`[X402] Payment payload received:`, JSON.stringify({
+      network: paymentPayload.network,
+      owner: paymentPayload.payload?.permit?.owner,
+      merchant: paymentPayload.payload?.route?.merchant,
+      amount: paymentPayload.payload?.route?.amountIn,
+    }, null, 2));
 
     const paymentRequirements = generatePaymentRequirements(service, req.originalUrl);
 
@@ -150,8 +167,8 @@ const requirePayment = (service) => async (req, res, next) => {
 
     if (!settleResponse.data.success) {
       // For demo mode, allow through if it's just a contract issue
-      if (settleResponse.data.error?.includes('Execution failed') || 
-          settleResponse.data.error?.includes('0x000000')) {
+      if (settleResponse.data.error?.includes('Execution failed') ||
+        settleResponse.data.error?.includes('0x000000')) {
         console.log(`[X402] Demo mode: Allowing through despite contract error`);
         req.paymentInfo = {
           success: true,
@@ -185,7 +202,7 @@ const requirePayment = (service) => async (req, res, next) => {
     next();
   } catch (error) {
     console.error('[X402] Payment processing error:', error.message);
-    
+
     // If facilitator is not running, allow demo mode
     if (error.code === 'ECONNREFUSED') {
       console.log('[X402] Facilitator not available - Demo mode enabled');
@@ -207,11 +224,12 @@ const aiRoutes = require('./routes/ai');
 
 // Health check (public)
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'X402 Protocol Backend is running',
     facilitatorUrl: FACILITATOR_URL,
-    merchantAddress: MERCHANT_ADDRESS,
+    relayerAddress: RELAYER_ADDRESS,
+    paymentRouterAddresses: PAYMENT_ROUTER_ADDRESSES,
   });
 });
 
@@ -219,17 +237,21 @@ app.get('/health', (req, res) => {
 app.get('/api/payment-requirements/:service', (req, res) => {
   const { service } = req.params;
   const requirements = generatePaymentRequirements(service, `/api/ai/${service}`);
-  
+
   if (!requirements) {
     return res.status(404).json({ error: 'Service not found' });
   }
-  
+
   res.json(requirements);
 });
 
 // Protected AI routes with X402 payment
-app.post('/api/ai/image-generation', requirePayment('image-generation'), aiRoutes);
-app.post('/api/ai/location-suggestions', requirePayment('location-suggestions'), aiRoutes);
+// Apply specific payment requirements for each endpoint
+app.post('/api/ai/image-generation', requirePayment('image-generation'));
+app.post('/api/ai/location-suggestions', requirePayment('location-suggestions'));
+
+// Mount the AI router for all /api/ai routes
+app.use('/api/ai', aiRoutes);
 
 // Status endpoint (public)
 app.get('/api/ai/status', (req, res, next) => {
