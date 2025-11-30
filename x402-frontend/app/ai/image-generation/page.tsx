@@ -1,41 +1,218 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import Header from "../../components/Header";
+import { useAccount, useChainId, useSwitchChain, useSignTypedData } from "wagmi";
+import { baseSepolia, sepolia, arbitrumSepolia, optimismSepolia } from "viem/chains";
+import { parseUnits, type Address } from "viem";
+
+const FACILITATOR_URL = "http://localhost:3000";
+const BACKEND_URL = "http://localhost:3001";
+
+// Chain configurations
+const CHAIN_CONFIGS: Record<string, { chainId: number; name: string; chain: any; usdc: Address }> = {
+  "base-sepolia": { chainId: 84532, name: "Base Sepolia", chain: baseSepolia, usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as Address },
+  "sepolia": { chainId: 11155111, name: "Sepolia", chain: sepolia, usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as Address },
+  "arbitrum-sepolia": { chainId: 421614, name: "Arbitrum Sepolia", chain: arbitrumSepolia, usdc: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d" as Address },
+  "optimism-sepolia": { chainId: 11155420, name: "Optimism Sepolia", chain: optimismSepolia, usdc: "0x5fd84259d66Cd46123540766Be93DFE6D43130D7" as Address },
+};
+
+type LogEntry = { timestamp: Date; type: "info" | "success" | "error" | "pending"; message: string };
 
 export default function ImageGenerationPage() {
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const { signTypedDataAsync } = useSignTypedData();
+
   const [query, setQuery] = useState("");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("base-sepolia");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [paymentRequired, setPaymentRequired] = useState<any>(null);
+  const [isPaid, setIsPaid] = useState(false);
 
-  const handleGenerate = async () => {
+  const addLog = (type: LogEntry["type"], message: string) => {
+    setLogs((prev) => [...prev, { timestamp: new Date(), type, message }]);
+  };
+
+  const generatePaymentId = () => {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    return "0x" + Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  // Check if service requires payment
+  const checkPaymentRequired = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/ai/image-generation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "test" }),
+      });
+
+      if (response.status === 402) {
+        const data = await response.json();
+        setPaymentRequired(data.paymentRequirements);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Error checking payment:", err);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    checkPaymentRequired();
+  }, []);
+
+  const handlePayAndGenerate = async () => {
     if (!query.trim()) {
       setError("Please enter a description");
+      return;
+    }
+
+    if (!isConnected || !address) {
+      setError("Please connect your wallet first");
       return;
     }
 
     setLoading(true);
     setError("");
     setResult(null);
+    setLogs([]);
 
     try {
-      const response = await fetch("http://localhost:3001/api/ai/image-generation", {
+      const networkConfig = CHAIN_CONFIGS[selectedNetwork];
+      const paymentId = generatePaymentId();
+      const amount = "1000000"; // 1 USDC
+      const deadline = Math.floor(Date.now() / 1000) + 3600;
+      const merchantAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0Ab0b";
+
+      addLog("info", `Starting X402 Payment Flow`);
+      addLog("info", `Network: ${networkConfig.name}`);
+      addLog("info", `Amount: 1 USDC`);
+
+      // Switch chain if needed
+      if (chainId !== networkConfig.chainId) {
+        addLog("pending", "Switching network...");
+        await switchChain({ chainId: networkConfig.chainId });
+        addLog("success", `Switched to ${networkConfig.name}`);
+      }
+
+      // Sign permit
+      addLog("pending", "Requesting signature...");
+
+      const permitDomain = {
+        name: "USDC",
+        version: "1",
+        chainId: BigInt(networkConfig.chainId),
+        verifyingContract: networkConfig.usdc,
+      };
+
+      const permitTypes = {
+        Permit: [
+          { name: "owner", type: "address" },
+          { name: "spender", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+        ],
+      };
+
+      const permitMessage = {
+        owner: address,
+        spender: merchantAddress as Address,
+        value: BigInt(amount),
+        nonce: BigInt(0),
+        deadline: BigInt(deadline),
+      };
+
+      const signature = await signTypedDataAsync({
+        domain: permitDomain,
+        types: permitTypes,
+        primaryType: "Permit",
+        message: permitMessage,
+      });
+
+      addLog("success", "Signature obtained");
+
+      // Parse signature
+      const r = signature.slice(0, 66);
+      const s = "0x" + signature.slice(66, 130);
+      const v = parseInt(signature.slice(130, 132), 16);
+
+      // Build X-PAYMENT payload
+      const paymentPayload = {
+        x402Version: 1,
+        scheme: "exact",
+        network: selectedNetwork,
+        payload: {
+          signature,
+          permit: {
+            token: networkConfig.usdc,
+            owner: address,
+            value: amount,
+            deadline,
+            v,
+            r,
+            s,
+          },
+          route: {
+            paymentId,
+            tokenIn: networkConfig.usdc,
+            tokenOut: "",
+            amountIn: amount,
+            minAmountOut: amount,
+            merchant: merchantAddress,
+            dexRouter: "",
+            dexCalldata: "",
+          },
+        },
+      };
+
+      addLog("pending", "Verifying payment...");
+
+      // Send request with X-PAYMENT header
+      const xPaymentHeader = btoa(JSON.stringify(paymentPayload));
+
+      const response = await fetch(`${BACKEND_URL}/api/ai/image-generation`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-PAYMENT": xPaymentHeader,
         },
         body: JSON.stringify({ query }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to generate image");
+      // Check for X-PAYMENT-RESPONSE header
+      const paymentResponse = response.headers.get("X-PAYMENT-RESPONSE");
+      if (paymentResponse) {
+        const decoded = JSON.parse(atob(paymentResponse));
+        addLog("success", `Payment settled! TX: ${decoded.txHash?.slice(0, 18)}...`);
+        setIsPaid(true);
       }
 
+      if (response.status === 402) {
+        const data = await response.json();
+        addLog("error", `Payment required: ${data.reason || data.message}`);
+        throw new Error(data.reason || "Payment required");
+      }
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to generate");
+      }
+
+      const data = await response.json();
+      addLog("success", "Image generated successfully!");
       setResult(data);
     } catch (err: any) {
+      addLog("error", err.message);
       setError(err.message || "An error occurred");
     } finally {
       setLoading(false);
@@ -43,8 +220,10 @@ export default function ImageGenerationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 dark:from-gray-900 dark:to-gray-800 p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 dark:from-gray-900 dark:to-gray-800">
+      <Header />
+      
+      <div className="max-w-6xl mx-auto p-8 pt-24">
         <div className="mb-8">
           <Link 
             href="/ai"
@@ -54,80 +233,148 @@ export default function ImageGenerationPage() {
           </Link>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
-            <div className="text-6xl mb-4">🎨</div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-              AI Image Generation
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300">
-              Powered by GROQ Llama 3.3 70B via X402 Protocol
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Describe the image you want to create
-              </label>
-              <textarea
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="E.g., A serene mountain landscape at sunset with a crystal clear lake"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white resize-none"
-                rows={4}
-              />
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Main Form */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+            <div className="text-center mb-8">
+              <div className="text-6xl mb-4">🎨</div>
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                AI Image Generation
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                Premium Service • 1 USDC per request
+              </p>
             </div>
 
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="w-full px-6 py-4 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all transform hover:scale-105"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Generating...
-                </span>
-              ) : (
-                "Generate Image"
-              )}
-            </button>
+            {/* Network Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Payment Network
+              </label>
+              <select
+                value={selectedNetwork}
+                onChange={(e) => setSelectedNetwork(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+              >
+                {Object.entries(CHAIN_CONFIGS).map(([key, config]) => (
+                  <option key={key} value={key}>{config.name}</option>
+                ))}
+              </select>
+            </div>
 
-            {error && (
-              <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 rounded-lg">
-                <p className="text-red-700 dark:text-red-400">{error}</p>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Describe the image you want to create
+                </label>
+                <textarea
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="E.g., A serene mountain landscape at sunset with a crystal clear lake"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white resize-none"
+                  rows={4}
+                />
+              </div>
+
+              <button
+                onClick={handlePayAndGenerate}
+                disabled={loading || !isConnected}
+                className="w-full px-6 py-4 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Processing...
+                  </span>
+                ) : !isConnected ? (
+                  "Connect Wallet to Continue"
+                ) : (
+                  "Pay 1 USDC & Generate"
+                )}
+              </button>
+
+              {!isConnected && (
+                <p className="text-center text-sm text-gray-500">
+                  Connect your wallet using the button in the header
+                </p>
+              )}
+
+              {error && (
+                <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 rounded-lg">
+                  <p className="text-red-700 dark:text-red-400">{error}</p>
+                </div>
+              )}
+
+              {result && (
+                <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    Generated Result
+                  </h3>
+                  <div className="text-gray-600 dark:text-gray-300">
+                    <pre className="bg-white dark:bg-gray-800 p-4 rounded overflow-auto whitespace-pre-wrap">
+                      {result.response || result.imageDescription || JSON.stringify(result, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Logs Panel */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              X402 Payment Logs
+            </h2>
+
+            <div className="bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm">
+              {logs.length === 0 ? (
+                <p className="text-gray-500">Waiting for payment flow...</p>
+              ) : (
+                <div className="space-y-2">
+                  {logs.map((log, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-start gap-2 ${
+                        log.type === "success" ? "text-green-400" :
+                        log.type === "error" ? "text-red-400" :
+                        log.type === "pending" ? "text-yellow-400" : "text-gray-300"
+                      }`}
+                    >
+                      <span className="text-gray-500 text-xs">
+                        {log.timestamp.toLocaleTimeString()}
+                      </span>
+                      <span>
+                        {log.type === "success" && "✓ "}
+                        {log.type === "error" && "✗ "}
+                        {log.type === "pending" && "⏳ "}
+                        {log.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Payment Info */}
+            {paymentRequired && (
+              <div className="mt-6 p-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <h3 className="font-semibold text-yellow-800 dark:text-yellow-400 mb-2">
+                  💰 Payment Required
+                </h3>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  This is a premium API. Cost: 1 USDC
+                </p>
               </div>
             )}
 
-            {result && (
-              <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  Generated Result
+            {isPaid && (
+              <div className="mt-6 p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <h3 className="font-semibold text-green-800 dark:text-green-400">
+                  ✅ Payment Complete
                 </h3>
-                {result.imageUrl ? (
-                  <div className="space-y-4">
-                    <img 
-                      src={result.imageUrl} 
-                      alt="Generated" 
-                      className="w-full rounded-lg shadow-lg"
-                    />
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
-                      <p><strong>Query:</strong> {result.query}</p>
-                      {result.model && <p><strong>Model:</strong> {result.model}</p>}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-gray-600 dark:text-gray-300">
-                    <p className="mb-2"><strong>Response:</strong></p>
-                    <pre className="bg-white dark:bg-gray-800 p-4 rounded overflow-auto">
-                      {JSON.stringify(result, null, 2)}
-                    </pre>
-                  </div>
-                )}
               </div>
             )}
           </div>

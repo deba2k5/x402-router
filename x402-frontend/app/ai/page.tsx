@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import Header from "../components/Header";
 
 export default function AIPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 dark:from-gray-900 dark:to-gray-800 p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 dark:from-gray-900 dark:to-gray-800">
+      <Header />
+      
+      <div className="max-w-6xl mx-auto p-8 pt-24">
         <div className="mb-8">
           <Link 
             href="/"
@@ -46,7 +49,7 @@ export default function AIPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span>✓</span>
-                  <span>X404 Protocol enabled</span>
+                  <span>X402 Protocol enabled</span>
                 </div>
               </div>
               <div className="mt-8 text-center">

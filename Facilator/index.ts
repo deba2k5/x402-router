@@ -10,12 +10,14 @@ import crypto from "crypto";
 config();
 
 // ============ Environment Variables ============
-const EVM_PRIVATE_KEY = process.env.EVM_PRIVATE_KEY as Hex;
+const EVM_PRIVATE_KEY = (process.env.EVM_PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000001") as Hex;
 const PORT = process.env.PORT || 3000;
 
-if (!EVM_PRIVATE_KEY) {
-  console.error("Missing EVM_PRIVATE_KEY environment variable");
-  process.exit(1);
+// Check if we're in demo mode
+const isDemoMode = !process.env.EVM_PRIVATE_KEY || process.env.EVM_PRIVATE_KEY === '0x';
+if (isDemoMode) {
+  console.log("⚠️  No EVM_PRIVATE_KEY set - running in DEMO MODE");
+  console.log("   Payments will be verified but not settled on-chain");
 }
 
 // ============ Chain Configuration ============
@@ -394,7 +396,22 @@ const executeRouteOnChain = async (
 
 // ============ Express App ============
 const app = express();
+
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, X-Payment, X-Payment-Response');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
+
+// Demo mode flag - set to true to skip actual blockchain transactions
+const DEMO_MODE = process.env.DEMO_MODE === 'true' || !EVM_PRIVATE_KEY || EVM_PRIVATE_KEY === '0x';
 
 // ============ Types for Request/Response ============
 type VerifyRequest = {
@@ -596,6 +613,26 @@ app.post("/settle", async (req: Request, res: Response) => {
     }
 
     console.log(`[SETTLE] Executing route for payment: ${paymentId}`);
+    console.log(`[SETTLE] Demo mode: ${DEMO_MODE}`);
+
+    // In demo mode, skip actual blockchain transaction
+    if (DEMO_MODE) {
+      const demoTxHash = `0x${crypto.randomBytes(32).toString("hex")}`;
+      record.status = "settled";
+      record.txHash = demoTxHash;
+
+      console.log(`[SETTLE] Demo mode - Payment settled`);
+      console.log(`  TxHash (demo): ${demoTxHash}`);
+      console.log(`  Network: ${record.routePlan.chainConfig.name}`);
+
+      const response: SettleResponse = {
+        success: true,
+        txHash: demoTxHash,
+        network: record.routePlan.chainConfig.name,
+      };
+      res.json(response);
+      return;
+    }
 
     // Execute the route on-chain
     const result = await executeRouteOnChain(record);

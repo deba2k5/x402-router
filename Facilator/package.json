@@ -3,6 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun run --watch index.ts",
+    "start": "bun run index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -11,10 +15,11 @@
   },
   "dependencies": {
     "@types/express": "^5.0.5",
+    "cors": "^2.8.5",
+    "@types/cors": "^2.8.17",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "viem": "^2.40.3",
-    "x402": "^0.7.3",
     "zod": "^4.1.13"
   }
 }

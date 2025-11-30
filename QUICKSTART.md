@@ -14,7 +14,7 @@
   - `POST /api/ai/image-generation` - Gemini-powered image generation
   - `POST /api/ai/location-suggestions` - Location-based AI suggestions
   - `GET /api/ai/status` - Service health check
-- ✅ **X404 Protocol** - Custom protocol implementation for AI queries
+- ✅ **X402 Protocol** - Custom protocol implementation for AI queries
 
 ## 🎯 Current Status
 
