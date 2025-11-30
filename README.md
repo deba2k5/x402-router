@@ -3,8 +3,6 @@ Got it — since the interface didn’t expose the generated file as a downloada
 
 ## **Overview**
 
-This document provides an implementation plan, architecture, contract requirements, backend logic, and UI flow for building a multi-chain x402 facilitator router capable of accepting payment from multiple chains and tokens.
-
 ## **Architecture Diagram (Mermaid)**
 
 ```mermaid
@@ -13,26 +11,26 @@ sequenceDiagram
 
     participant C as Client (dApp)
     participant S as API Server (/api)
-    participant F as MultiChain x402 Facilitator (backend)
-    participant RC as RouterContract (Base/Sepolia/Arb/Opt)
-    participant D as DEX/Bridge (Uniswap/Mayan)
+    participant F as MultiChain<br/>x402 Facilitator (backend)
+    participant RC as RouterContract<br/>(Base/Sepolia/Arb/Opt)
+    participant D as DEX/Bridge<br/>(Uniswap/Mayan)
     participant L1 as Blockchain
 
     C->>S: 1. GET /api
-    S-->>C: 2. 402 Payment Required (paymentRequirements: chains+tokens)
+    S-->>C: 2. 402 Payment Required<br/>(paymentRequirements: chains+tokens)
 
-    C->>F: 3. POST /pay (X-PAYMENT: signed payload)
-    F->>F: 4. Verify signature + build RoutePlan (chain, tokenIn, tokenOut, amount, dest)
+    C->>F: 3. POST /pay<br/>X-PAYMENT (signed payload)
+    F->>F: 4. Verify signature + build RoutePlan<br/>(chain, tokenIn, tokenOut, amount, dest)
 
-    F->>RC: 5. executeRoute(permit, route) (on chosen chain)
+    F->>RC: 5. executeRoute(permit, route)<br/>(on chosen chain)
     RC->>D: 6. swap / bridge token as per route
     D->>L1: 7. On-chain txs (swap/bridge/transfer)
     L1-->>RC: 8. Tx confirmed (event with amountOut)
     RC-->>F: 9. Return txHash, amountOut
 
-    F-->>S: 10. /settle success (X-PAYMENT-RESPONSE)
+    F-->>S: 10. /settle success<br/>X-PAYMENT-RESPONSE
     S-->>C: 11. 200 OK + protected resource
-
+```
 ---
 
 ## **Smart Contract Requirements**
@@ -60,7 +58,6 @@ Deploy the same contract on:
 struct PermitData {
     address token;
     address owner;
-    uint256 value;
     uint256 nonce;
     uint256 deadline;
     bytes sig;
