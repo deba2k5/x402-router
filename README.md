@@ -1,18 +1,9 @@
 Got it — since the interface didn’t expose the generated file as a downloadable link, I’ll give you **the full Markdown content directly here** so you can **copy-paste into a file** or I can recreate it again as a downloadable file if your UI supports it.
 
----
-
-# **📄 Multi-Chain x402 Payment Router — Build Guide (15h Hackathon)**
 
 ## **Overview**
 
 This document provides an implementation plan, architecture, contract requirements, backend logic, and UI flow for building a multi-chain x402 facilitator router capable of accepting payment from multiple chains and tokens.
-
-### **Core Concept**
-
-Use x402 to protect a resource endpoint (`/api/secret`) and route settlement across multiple chains via a custom backend facilitator and a `PaymentRouter` smart contract.
-
----
 
 ## **Architecture Diagram (Mermaid)**
 
@@ -20,28 +11,27 @@ Use x402 to protect a resource endpoint (`/api/secret`) and route settlement acr
 sequenceDiagram
     autonumber
 
-    participant C as Client (dApp UI)
-    participant S as API Server (/api/secret)
-    participant F as MultiChain x402 Facilitator (Backend)
-    participant RC as RouterContract (EVM Chain)
+    participant C as Client (dApp)
+    participant S as API Server (/api)
+    participant F as MultiChain x402 Facilitator (backend)
+    participant RC as RouterContract (Base/Sepolia/Arb/Opt)
     participant D as DEX/Bridge (Uniswap/Mayan)
     participant L1 as Blockchain
 
-    C->>S: GET /api/secret
-    S-->>C: 402 Payment Required (PaymentRequirements JSON)
+    C->>S: 1. GET /api
+    S-->>C: 2. 402 Payment Required (paymentRequirements: chains+tokens)
 
-    C->>F: POST /pay (X-PAYMENT Header)
-    F->>F: Verify signature + construct RoutePlan
+    C->>F: 3. POST /pay (X-PAYMENT: signed payload)
+    F->>F: 4. Verify signature + build RoutePlan (chain, tokenIn, tokenOut, amount, dest)
 
-    F->>RC: executeRoute(permit, routeParams)
-    RC->>D: Swap/Bridge if needed
-    D->>L1: On-chain transaction
-    L1-->>RC: Tx confirmed
-    RC-->>F: return txHash
+    F->>RC: 5. executeRoute(permit, route) (on chosen chain)
+    RC->>D: 6. swap / bridge token as per route
+    D->>L1: 7. On-chain txs (swap/bridge/transfer)
+    L1-->>RC: 8. Tx confirmed (event with amountOut)
+    RC-->>F: 9. Return txHash, amountOut
 
-    F-->>S: Settle success (X-PAYMENT-RESPONSE)
-    S-->>C: 200 OK (unlocked resource)
-```
+    F-->>S: 10. /settle success (X-PAYMENT-RESPONSE)
+    S-->>C: 11. 200 OK + protected resource
 
 ---
 
@@ -64,15 +54,12 @@ Deploy the same contract on:
 * Transfer to merchant payout address
 * Emit event for backend confirmation
 
----
-
 ### **Data Structures**
 
 ```solidity
 struct PermitData {
     address token;
     address owner;
-    address spender;
     uint256 value;
     uint256 nonce;
     uint256 deadline;
