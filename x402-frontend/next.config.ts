@@ -28,7 +28,7 @@ const nextConfig: any = {
   turbopack: {
     root: __dirname,
   },
-
+ 
   // Webpack configuration (works for both dev and build)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   webpack: (config: any, { isServer }: any) => {
