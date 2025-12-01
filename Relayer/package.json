@@ -2,12 +2,12 @@
   "name": "x402-simple-bridge-relayer",
   "version": "1.0.0",
   "description": "SimpleBridge off-chain relayer service for cross-chain token transfers",
-  "main": "relayer.ts",
+  "main": "api/relayer.ts",
   "type": "module",
   "scripts": {
-    "dev": "bun run --watch relayer.ts",
-    "start": "bun run relayer.ts",
-    "build": "bun build relayer.ts --outfile dist/relayer.js"
+    "dev": "bun run --watch api/relayer.ts",
+    "start": "bun run api/relayer.ts",
+    "build": "bun build api/relayer.ts --outfile dist/relayer.js && mkdir -p public && echo 'Relayer API' > public/index.html"
   },
   "dependencies": {
     "viem": "^2.40.3",
