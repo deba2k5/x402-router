@@ -50,7 +50,7 @@ export default function AIPage() {
                 borderRadius="1.5rem"
                 height="100%"
               >
-                <div className="relative bg-white rounded-3xl border-2 border-gray-200 p-10 h-full">
+                <div className="relative bg-zinc-900 rounded-3xl border-2 border-zinc-800 p-10 h-full">
                   {/* Top Section */}
                   <div className="flex items-start justify-between mb-8">
                     <div className="flex-1">
@@ -60,10 +60,10 @@ export default function AIPage() {
                         </svg>
                       </div>
 
-                      <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                      <h2 className="text-3xl font-bold text-white mb-3">
                         AI Image Generation
                       </h2>
-                      <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                      <p className="text-zinc-400 text-lg leading-relaxed mb-6">
                         Transform text into stunning visuals using advanced GROQ Llama 3.3 70B AI technology.
                       </p>
                     </div>
@@ -83,21 +83,20 @@ export default function AIPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        <span className="text-gray-700 font-medium">{feature}</span>
+                        <span className="text-zinc-300 font-medium">{feature}</span>
                       </div>
                     ))}
                   </div>
 
                   {/* Bottom Section */}
-                  <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+                  <div className="flex items-center justify-between pt-6 border-t border-zinc-800">
                     <div>
-                      <div className="text-3xl font-black text-gray-900">1 USDC</div>
-                      <div className="text-sm text-gray-500 font-medium">per generation</div>
+                      <div className="text-3xl font-black text-white">1 USDC</div>
+                      <div className="text-sm text-zinc-500 font-medium">per generation</div>
                     </div>
                     <div className="relative">
                       {/* Animated gradient border */}
-                      <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl opacity-75 blur group-hover:opacity-100 animate-pulse"></div>
-                      <div className="relative bg-white px-6 py-3 rounded-xl border-2 border-transparent bg-clip-padding">
+                      <div className="absolute -inset-1 bg-gradient-to-r  rounded-xl opacity-75  group-hover:opacity-100 animate-pulse"></div>
                         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity -z-10"></div>
                         <div className="flex items-center gap-2 text-indigo-600 group-hover:text-white font-bold text-lg group-hover:gap-4 transition-all relative z-10">
                           <span>Generate</span>
@@ -105,7 +104,7 @@ export default function AIPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                           </svg>
                         </div>
-                      </div>
+                      
                     </div>
                   </div>
 
@@ -127,7 +126,7 @@ export default function AIPage() {
                 borderRadius="1.5rem"
                 height="100%"
               >
-                <div className="relative bg-white rounded-3xl border-2 border-gray-200 p-10 h-full">
+                <div className="relative bg-zinc-900 rounded-3xl border-2 border-zinc-800 p-10 h-full">
                   {/* Top Section */}
                   <div className="flex items-start justify-between mb-8">
                     <div className="flex-1">
@@ -138,10 +137,10 @@ export default function AIPage() {
                         </svg>
                       </div>
 
-                      <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                      <h2 className="text-3xl font-bold text-white mb-3">
                         Location Intelligence
                       </h2>
-                      <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                      <p className="text-zinc-400 text-lg leading-relaxed mb-6">
                         Discover amazing places with AI-powered personalized recommendations.
                       </p>
                     </div>
@@ -161,28 +160,27 @@ export default function AIPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        <span className="text-gray-700 font-medium">{feature}</span>
+                        <span className="text-zinc-300 font-medium">{feature}</span>
                       </div>
                     ))}
                   </div>
 
                   {/* Bottom Section */}
-                  <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+                  <div className="flex items-center justify-between pt-6 border-t border-zinc-800">
                     <div>
-                      <div className="text-3xl font-black text-gray-900">1 USDC</div>
-                      <div className="text-sm text-gray-500 font-medium">per request</div>
+                      <div className="text-3xl font-black text-white">1 USDC</div>
+                      <div className="text-sm text-zinc-500 font-medium">per request</div>
                     </div>
                     <div className="relative">
                       {/* Animated gradient border */}
-                      <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-xl opacity-75 blur group-hover:opacity-100 animate-pulse"></div>
-                      <div className="relative bg-white px-6 py-3 rounded-xl border-2 border-transparent bg-clip-padding">
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity -z-10"></div>
+                      <div className="absolute -inset-1  group-hover:opacity-100"></div>
+                        <div className="absolute inset-0 opacity-0 "></div>
                         <div className="flex items-center gap-2 text-emerald-600 group-hover:text-white font-bold text-lg group-hover:gap-4 transition-all relative z-10">
                           <span>Discover</span>
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                           </svg>
-                        </div>
+                        
                       </div>
                     </div>
                   </div>
