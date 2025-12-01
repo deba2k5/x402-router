@@ -16,7 +16,7 @@ export default function Header({ darkMode = false }: { darkMode?: boolean }) {
   }, []);
 
   const textColor = scrolled ? 'text-gray-100' : (darkMode ? 'text-white' : 'text-gray-100');
-  const navColor = scrolled ? 'text-gray-700 hover:text-gray-100' : (darkMode ? 'text-gray-200 hover:text-black' : 'text-gray-300 hover:text-black');
+  const navColor = scrolled ? 'text-gray-300 hover:text-white' : (darkMode ? 'text-gray-200 hover:text-white' : 'text-gray-300 hover:text-black');
 
   return (
     <header
