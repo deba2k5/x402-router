@@ -1,14 +1,14 @@
 {
   "version": 2,
   "functions": {
-    "relayer.ts": {
+    "api/relayer.ts": {
       "maxDuration": 60
     }
   },
   "routes": [
     {
       "src": "/api/relayer",
-      "dest": "relayer.ts"
+      "dest": "api/relayer.ts"
     }
   ]
 }
