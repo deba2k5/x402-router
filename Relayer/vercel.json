@@ -1,15 +1,14 @@
 {
   "version": 2,
   "functions": {
-    "api/relayer.ts": {
+    "relayer.ts": {
       "maxDuration": 60
     }
   },
-  "builds": [
-    { "src": "api/relayer.ts", "use": "@vercel/node" },
-    { "src": "relayer.ts", "use": "@vercel/node" }
-  ],
   "routes": [
-    { "src": "/api/relayer", "dest": "api/relayer.ts" }
+    {
+      "src": "/api/relayer",
+      "dest": "relayer.ts"
+    }
   ]
 }
