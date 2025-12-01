@@ -18,6 +18,7 @@ export default function Header({ darkMode = false }: { darkMode?: boolean }) {
   const textColor = scrolled ? 'text-gray-100' : (darkMode ? 'text-white' : 'text-gray-100');
   const navColor = scrolled ? 'text-gray-300 hover:text-white' : (darkMode ? 'text-gray-200 hover:text-white' : 'text-gray-300 hover:text-black');
 
+  
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
