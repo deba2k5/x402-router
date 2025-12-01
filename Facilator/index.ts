@@ -232,7 +232,7 @@ const RouteParamsSchema = z.object({
   dexRouter: z.string().optional(),
   dexCalldata: z.string().optional(),
   bridgeRequired: z.boolean().optional(),
-  bridgeType: z.string().optional(),
+  bridgeType: z.string().nullable().optional(),
 });
 
 const PaymentPayloadSchema = z.object({
@@ -302,8 +302,8 @@ const generatePaymentId = (): string => {
 /**
  * Get chain config by network name
  */
-const getChainConfig = (network: string): ChainConfig | null => {
-  return CHAIN_CONFIGS[network] || null;
+const getChainConfig = (network: string): ChainConfig | undefined => {
+  return CHAIN_CONFIGS[network] || undefined;
 };
 
 /**
@@ -381,11 +381,11 @@ const buildRoutePlan = (
     : null;
 
   const needsSwap = tokenOut !== null && tokenOut.address.toLowerCase() !== tokenIn.address.toLowerCase();
-  
+
   // Check if cross-chain payment
   const bridgeRequired = payload.payload.route.bridgeRequired || false;
   const bridgeType = payload.payload.route.bridgeType || "mayan";
-  
+
   // Get destination chain config if cross-chain
   let destinationChainConfig: ChainConfig | undefined;
   if (bridgeRequired && payload.payload.route.destinationNetwork) {
@@ -445,8 +445,8 @@ const executeRouteOnChain = async (
     const tokenIn = payload.payload.route.tokenIn as Address;
     let tokenOut = (payload.payload.route.tokenOut || "0x0000000000000000000000000000000000000000") as Address;
 
-    // If tokenOut is empty string or same as tokenIn, set to zero address (no swap)
-    if (!tokenOut || tokenOut === "" || tokenOut.toLowerCase() === tokenIn.toLowerCase()) {
+    // If tokenOut is zero address or same as tokenIn, set to zero address (no swap)
+    if (!tokenOut || tokenOut.toLowerCase() === tokenIn.toLowerCase()) {
       tokenOut = "0x0000000000000000000000000000000000000000" as Address;
       dexRouter = "0x0000000000000000000000000000000000000000" as Address;
       dexCalldata = "0x" as Hex;
@@ -539,7 +539,7 @@ const bridgeViaContract = async (
 
     // Get SimpleBridge address for source chain
     const BRIDGE_ADDRESS = BRIDGE_ADDRESSES[sourceChainId];
-    
+
     if (!BRIDGE_ADDRESS) {
       console.warn(`[BRIDGE] SimpleBridge not deployed on ${sourceConfig.name} (chain ${sourceChainId})`);
       console.log(`[BRIDGE] Simulating bridge with demo transaction...`);
@@ -591,10 +591,10 @@ const bridgeViaContract = async (
         functionName: "approve",
         args: [BRIDGE_ADDRESS, amount],
       });
-      
+
       console.log(`[BRIDGE] Approval TX: ${approveTx}`);
       console.log(`[BRIDGE] Waiting for approval confirmation...`);
-      
+
       // Wait a bit for approval to be confirmed
       await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (approveError) {
@@ -911,10 +911,10 @@ app.post("/settle", async (req: Request, res: Response) => {
       // If cross-chain, initiate bridge
       if (record.routePlan.bridgeRequired && record.routePlan.destinationChainConfig) {
         console.log(`[SETTLE] Initiating cross-chain bridge to ${record.routePlan.destinationChainConfig.name}...`);
-        
+
         const account = privateKeyToAccount(EVM_PRIVATE_KEY);
         const bridgeId = `0x${crypto.randomBytes(32).toString('hex')}`;
-        
+
         const bridgeResult = await bridgeViaContract(
           record.routePlan.chainConfig.chainId,
           record.routePlan.destinationChainConfig.chainId,
