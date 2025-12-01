@@ -54,6 +54,7 @@ export default function LocationSuggestionsPage() {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState<string>("base-sepolia");
+  const [destinationNetwork, setDestinationNetwork] = useState<string>("base-sepolia");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
@@ -172,45 +173,43 @@ export default function LocationSuggestionsPage() {
       const s = "0x" + signature.slice(66, 130);
       const v = parseInt(signature.slice(130, 132), 16);
 
-      // Build X-PAYMENT payload
-      const paymentPayload = {
-        x402Version: 1,
-        scheme: "exact",
-        network: selectedNetwork,
-        payload: {
-          signature,
-          permit: {
-            token: networkConfig.usdc,
-            owner: address,
-            value: amount,
-            deadline,
-            v,
-            r,
-            s,
-          },
-          route: {
-            paymentId,
-            tokenIn: networkConfig.usdc,
-            tokenOut: "",
-            amountIn: amount,
-            minAmountOut: amount,
-            merchant: RELAYER_ADDRESS,
-            dexRouter: "",
-            dexCalldata: "",
-          },
-        },
+      // Prepare permit data
+      const permitData = {
+        token: networkConfig.usdc,
+        owner: address,
+        value: amount,
+        deadline,
+        v,
+        r,
+        s,
       };
 
-      addLog("pending", "Verifying payment...");
+      const destinationConfig = CHAIN_CONFIGS[destinationNetwork];
+      const isCrossChain = selectedNetwork !== destinationNetwork;
 
-      // Send request with X-PAYMENT header
-      const xPaymentHeader = btoa(JSON.stringify(paymentPayload));
+      addLog("pending", "Verifying payment...");
 
       const response = await fetch(`${BACKEND_URL}/api/ai/location-suggestions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-PAYMENT": xPaymentHeader,
+          "x-payment-permit": JSON.stringify(permitData),
+          "x-payment-route": JSON.stringify({
+            paymentId,
+            sourceNetwork: selectedNetwork,
+            sourceChainId: networkConfig.chainId,
+            destinationNetwork: destinationNetwork,
+            destinationChainId: destinationConfig.chainId,
+            tokenIn: networkConfig.usdc,
+            tokenOut: networkConfig.usdc, // Same token on source chain (no swap)
+            amountIn: amount,
+            minAmountOut: amount, // Same amount (no swap)
+            merchant: RELAYER_ADDRESS,
+            dexRouter: "0x0000000000000000000000000000000000000000", // No swap
+            dexCalldata: "0x", // No swap
+            bridgeRequired: isCrossChain,
+            bridgeType: isCrossChain ? "mayan" : null,
+          }),
         },
         body: JSON.stringify({ query, location }),
       });
@@ -286,6 +285,27 @@ export default function LocationSuggestionsPage() {
                   <option key={key} value={key}>{config.name}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Destination Network Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Settle On (Destination Chain)
+              </label>
+              <select
+                value={destinationNetwork}
+                onChange={(e) => setDestinationNetwork(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+              >
+                {Object.entries(CHAIN_CONFIGS).map(([key, config]) => (
+                  <option key={key} value={key}>{config.name}</option>
+                ))}
+              </select>
+              {selectedNetwork !== destinationNetwork && (
+                <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                  ✨ Cross-chain payment enabled - will be bridged via Mayan Protocol
+                </p>
+              )}
             </div>
 
             <div className="space-y-6">

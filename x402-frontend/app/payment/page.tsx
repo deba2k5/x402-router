@@ -67,6 +67,7 @@ export default function PaymentPage() {
   const { signTypedDataAsync } = useSignTypedData();
 
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkKey>("base-sepolia");
+  const [destinationNetwork, setDestinationNetwork] = useState<NetworkKey>("base-sepolia");
   const [selectedToken, setSelectedToken] = useState(CHAIN_CONFIGS["base-sepolia"].tokens[0]);
   const [amount, setAmount] = useState("1");
   const [paymentRouterAddress, setPaymentRouterAddress] = useState(CHAIN_CONFIGS["base-sepolia"].paymentRouter);
@@ -204,6 +205,10 @@ export default function PaymentPage() {
         },
       };
 
+      // Get destination network config
+      const destinationConfig = CHAIN_CONFIGS[destinationNetwork];
+      const isCrossChain = selectedNetwork !== destinationNetwork;
+
       const paymentRequirements = {
         scheme: "exact",
         network: selectedNetwork,
@@ -214,13 +219,33 @@ export default function PaymentPage() {
         asset: selectedToken.address,
       };
 
+      if (isCrossChain) {
+        addLog("info", `Cross-chain payment: ${CHAIN_CONFIGS[selectedNetwork].name} → ${destinationConfig.name}`);
+      }
+
       // Step 1: Verify payment with facilitator
       addLog("pending", "Verifying payment with facilitator...");
       
+      const verifyPayload = {
+        ...paymentPayload,
+        payload: {
+          ...paymentPayload.payload,
+          route: {
+            ...paymentPayload.payload.route,
+            sourceNetwork: selectedNetwork,
+            sourceChainId: networkConfig.chainId,
+            destinationNetwork: destinationNetwork,
+            destinationChainId: destinationConfig.chainId,
+            bridgeRequired: isCrossChain,
+            bridgeType: isCrossChain ? "mayan" : null,
+          },
+        },
+      };
+
       const verifyResponse = await fetch("http://localhost:3000/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentPayload, paymentRequirements }),
+        body: JSON.stringify({ paymentPayload: verifyPayload, paymentRequirements }),
       });
 
       const verifyResult = await verifyResponse.json();
@@ -237,7 +262,7 @@ export default function PaymentPage() {
       const settleResponse = await fetch("http://localhost:3000/settle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentPayload, paymentRequirements }),
+        body: JSON.stringify({ paymentPayload: verifyPayload, paymentRequirements }),
       });
 
       const settleResult = await settleResponse.json();
@@ -315,7 +340,28 @@ export default function PaymentPage() {
                 </select>
               </div>
 
-              {/* Token Selection */}
+              {/* Destination Network Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Settle On (Destination Chain)
+                </label>
+                <select
+                  value={destinationNetwork}
+                  onChange={(e) => setDestinationNetwork(e.target.value as NetworkKey)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                >
+                  {Object.entries(CHAIN_CONFIGS).map(([key, config]) => (
+                    <option key={key} value={key}>
+                      {config.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedNetwork !== destinationNetwork && (
+                  <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                    ✨ Cross-chain payment enabled - will be bridged via Mayan Protocol
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Select Token

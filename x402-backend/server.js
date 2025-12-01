@@ -81,31 +81,57 @@ const generatePaymentRequirements = (service, resource) => {
  */
 const requirePayment = (service) => async (req, res, next) => {
   const xPayment = req.headers['x-payment'];
+  const xPaymentPermit = req.headers['x-payment-permit'];
+  const xPaymentRoute = req.headers['x-payment-route'];
   const xPaymentResponse = req.headers['x-payment-response'];
 
   // If no payment header, return 402 Payment Required
-  if (!xPayment) {
+  if (!xPayment && (!xPaymentPermit || !xPaymentRoute) && !xPaymentResponse) {
     const paymentRequirements = generatePaymentRequirements(service, req.originalUrl);
-
     return res.status(402).json({
-      error: 'Payment Required',
+      error: 'Payment required',
       message: 'This is a premium API endpoint. Please complete payment to access.',
       paymentRequirements,
       instructions: {
         step1: 'Connect your wallet on the frontend',
         step2: 'Sign the payment permit',
-        step3: 'Include the X-PAYMENT header with your signed payload',
+        step3: 'Include the X-PAYMENT header with your signed payload, or X-PAYMENT-PERMIT and X-PAYMENT-ROUTE headers',
       },
     });
   }
 
   try {
-    // Parse the X-PAYMENT header (base64 encoded JSON)
+    // Parse payment payload
     let paymentPayload;
-    try {
-      paymentPayload = JSON.parse(Buffer.from(xPayment, 'base64').toString('utf-8'));
-    } catch {
-      paymentPayload = JSON.parse(xPayment);
+
+    if (xPaymentPermit && xPaymentRoute) {
+      // New format
+      const permit = JSON.parse(xPaymentPermit);
+      const route = JSON.parse(xPaymentRoute);
+
+      // Use sourceNetwork from route if available, otherwise default
+      const network = route.sourceNetwork || req.body.network || 'base-sepolia';
+
+      paymentPayload = {
+        network: network,
+        x402Version: 1,
+        scheme: "exact",
+        payload: {
+          permit,
+          route,
+          signature: `0x${permit.r.slice(2)}${permit.s.slice(2)}${permit.v.toString(16)}` // Reconstruct signature for logs if needed
+        }
+      };
+
+      // Infer network from chainId in permit if possible, or use default
+      // For now we trust the route params or default
+    } else {
+      // Legacy X-PAYMENT header
+      try {
+        paymentPayload = JSON.parse(Buffer.from(xPayment, 'base64').toString('utf-8'));
+      } catch {
+        paymentPayload = JSON.parse(xPayment);
+      }
     }
 
     console.log(`[X402] Payment payload received:`, JSON.stringify({
@@ -113,6 +139,7 @@ const requirePayment = (service) => async (req, res, next) => {
       owner: paymentPayload.payload?.permit?.owner,
       merchant: paymentPayload.payload?.route?.merchant,
       amount: paymentPayload.payload?.route?.amountIn,
+      tokenIn: paymentPayload.payload?.route?.tokenIn,
     }, null, 2));
 
     const paymentRequirements = generatePaymentRequirements(service, req.originalUrl);

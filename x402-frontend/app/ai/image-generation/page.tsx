@@ -12,13 +12,23 @@ const BACKEND_URL = "http://localhost:3001";
 const RELAYER_ADDRESS = "0x95Cf028D5e86863570E300CAD14484Dc2068eB79" as Address;
 
 // Chain configurations with deployed PaymentRouter and token addresses
-const CHAIN_CONFIGS: Record<string, { chainId: number; name: string; chain: any; paymentRouter: Address; usdc: Address }> = {
+const CHAIN_CONFIGS: Record<string, {
+  chainId: number;
+  name: string;
+  chain: any;
+  paymentRouter: Address;
+  usdc: Address;
+  dai?: Address;
+  dexRouter?: Address;
+}> = {
   "base-sepolia": {
     chainId: 84532,
     name: "Base Sepolia",
     chain: baseSepolia,
     paymentRouter: "0xC858560Ac08048258e57a1c6C47dAf682fC25F62" as Address,
-    usdc: "0x2b23c6e36b46cC013158Bc2869D686023FA85422" as Address
+    usdc: "0x2b23c6e36b46cC013158Bc2869D686023FA85422" as Address,
+    dai: "0x6eb198E04d9a6844F74FC099d35b292127656A3F" as Address,
+    dexRouter: "0x3351F07aF05108C102b3a8a24b61B26737c14D4a" as Address
   },
   "sepolia": {
     chainId: 11155111,
@@ -53,6 +63,8 @@ export default function ImageGenerationPage() {
 
   const [query, setQuery] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState<string>("base-sepolia");
+  const [destinationNetwork, setDestinationNetwork] = useState<string>("base-sepolia");
+  const [selectedToken, setSelectedToken] = useState<"USDC" | "DAI">("USDC");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
@@ -114,13 +126,24 @@ export default function ImageGenerationPage() {
     try {
       const networkConfig = CHAIN_CONFIGS[selectedNetwork];
       const paymentId = generatePaymentId();
-      const amount = "1000000"; // 1 USDC
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const paymentRouterAddress = networkConfig.paymentRouter; // Spender in permit
 
+      // Determine input token
+      const tokenIn = selectedToken === "DAI" && networkConfig.dai
+        ? networkConfig.dai
+        : networkConfig.usdc;
+
+      // For demo, we assume 1:1 swap rate for simplicity, or we could fetch quote
+      // If paying with DAI, we still pay 1 unit (1e18 for DAI vs 1e6 for USDC)
+      const amount = selectedToken === "DAI"
+        ? parseUnits("1", 18).toString() // 1 DAI
+        : "1000000"; // 1 USDC
+
       addLog("info", `Starting X402 Payment Flow`);
       addLog("info", `Network: ${networkConfig.name}`);
-      addLog("info", `Amount: 1 USDC`);
+      addLog("info", `Pay with: ${selectedToken}`);
+      addLog("info", `Amount: ${selectedToken === "DAI" ? "1 DAI" : "1 USDC"}`);
       addLog("info", `User Address: ${address}`);
       addLog("info", `PaymentRouter (Spender): ${paymentRouterAddress}`);
 
@@ -136,8 +159,8 @@ export default function ImageGenerationPage() {
         addLog("success", `Switched to ${networkConfig.name}`);
       }
 
-      // Fetch current nonce from USDC contract
-      addLog("pending", "Fetching permit nonce...");
+      // Fetch current nonce from Token contract
+      addLog("pending", `Fetching ${selectedToken} permit nonce...`);
 
       const { createPublicClient, http } = await import('viem');
       const publicClient = createPublicClient({
@@ -146,7 +169,7 @@ export default function ImageGenerationPage() {
       });
 
       const currentNonce = await publicClient.readContract({
-        address: networkConfig.usdc,
+        address: tokenIn,
         abi: [
           {
             name: 'nonces',
@@ -166,10 +189,10 @@ export default function ImageGenerationPage() {
       addLog("pending", "Requesting signature...");
 
       const permitDomain = {
-        name: "Mock USDC",
+        name: selectedToken === "DAI" ? "Mock DAI" : "Mock USDC",
         version: "1",
         chainId: BigInt(networkConfig.chainId),
-        verifyingContract: networkConfig.usdc,
+        verifyingContract: tokenIn,
       };
 
       const permitTypes = {
@@ -204,45 +227,47 @@ export default function ImageGenerationPage() {
       const s = "0x" + signature.slice(66, 130);
       const v = parseInt(signature.slice(130, 132), 16);
 
-      // Build X-PAYMENT payload
-      const paymentPayload = {
-        x402Version: 1,
-        scheme: "exact",
-        network: selectedNetwork,
-        payload: {
-          signature,
-          permit: {
-            token: networkConfig.usdc,
-            owner: address,
-            value: amount,
-            deadline,
-            v,
-            r,
-            s,
-          },
-          route: {
-            paymentId,
-            tokenIn: networkConfig.usdc,
-            tokenOut: "",
-            amountIn: amount,
-            minAmountOut: amount,
-            merchant: RELAYER_ADDRESS,
-            dexRouter: "",
-            dexCalldata: "",
-          },
-        },
+      const permitData = {
+        token: tokenIn,
+        owner: address,
+        value: amount,
+        deadline,
+        v,
+        r,
+        s,
       };
 
-      addLog("pending", "Verifying payment...");
+      // Send to backend
+      addLog("pending", "Verifying payment with facilitator...");
 
-      // Send request with X-PAYMENT header
-      const xPaymentHeader = btoa(JSON.stringify(paymentPayload));
+      const destinationConfig = CHAIN_CONFIGS[destinationNetwork];
+      const isCrossChain = selectedNetwork !== destinationNetwork;
+
+      if (isCrossChain) {
+        addLog("info", `Cross-chain payment: ${CHAIN_CONFIGS[selectedNetwork].name} → ${destinationConfig.name}`);
+      }
 
       const response = await fetch(`${BACKEND_URL}/api/ai/image-generation`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-PAYMENT": xPaymentHeader,
+          "x-payment-permit": JSON.stringify(permitData),
+          "x-payment-route": JSON.stringify({
+            paymentId,
+            sourceNetwork: selectedNetwork,
+            sourceChainId: networkConfig.chainId,
+            destinationNetwork: destinationNetwork,
+            destinationChainId: destinationConfig.chainId,
+            tokenIn, // Send selected token (what user pays with)
+            tokenOut: tokenIn, // Settlement happens in same token on source chain
+            amountIn: amount,
+            minAmountOut: amount, // Same amount (no swap needed on source)
+            merchant: RELAYER_ADDRESS, // Payment recipient on source chain
+            dexRouter: "0x0000000000000000000000000000000000000000", // No swap needed
+            dexCalldata: "0x", // No swap needed
+            bridgeRequired: isCrossChain,
+            bridgeType: isCrossChain ? "mayan" : null,
+          }),
         },
         body: JSON.stringify({ query }),
       });
@@ -343,6 +368,54 @@ export default function ImageGenerationPage() {
                   <option key={key} value={key}>{config.name}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Destination Network Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Settle On (Destination Chain)
+              </label>
+              <select
+                value={destinationNetwork}
+                onChange={(e) => setDestinationNetwork(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+              >
+                {Object.entries(CHAIN_CONFIGS).map(([key, config]) => (
+                  <option key={key} value={key}>{config.name}</option>
+                ))}
+              </select>
+              {selectedNetwork !== destinationNetwork && (
+                <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                  ✨ Cross-chain payment enabled - will be bridged via Mayan Protocol
+                </p>
+              )}
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Pay with
+              </label>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setSelectedToken("USDC")}
+                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${selectedToken === "USDC"
+                    ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-400 dark:text-indigo-300"
+                    : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
+                    }`}
+                >
+                  <span className="font-bold">USDC</span>
+                </button>
+                <button
+                  onClick={() => setSelectedToken("DAI")}
+                  disabled={!CHAIN_CONFIGS[selectedNetwork].dai}
+                  className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${selectedToken === "DAI"
+                    ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-400 dark:text-indigo-300"
+                    : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
+                    } ${!CHAIN_CONFIGS[selectedNetwork].dai ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <span className="font-bold">DAI</span>
+                  {CHAIN_CONFIGS[selectedNetwork].dai && <span className="text-xs ml-2 bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Swap</span>}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-6">
