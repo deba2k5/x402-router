@@ -7,8 +7,8 @@ import { useAccount, useChainId, useSwitchChain, useSignTypedData } from "wagmi"
 import { baseSepolia, sepolia, arbitrumSepolia, optimismSepolia } from "viem/chains";
 import { type Address } from "viem";
 
-const FACILITATOR_URL = "http://localhost:3000";
-const BACKEND_URL = "http://localhost:3001";
+const FACILITATOR_URL = process.env.NEXT_PUBLIC_FACILITATOR_URL || "http://localhost:3000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 const RELAYER_ADDRESS = "0x95Cf028D5e86863570E300CAD14484Dc2068eB79" as Address;
 
 // Chain configurations with deployed PaymentRouter and token addresses
@@ -474,8 +474,8 @@ export default function LocationSuggestionsPage() {
                     <div
                       key={index}
                       className={`flex items-start gap-2 ${log.type === "success" ? "text-green-400" :
-                          log.type === "error" ? "text-red-400" :
-                            log.type === "pending" ? "text-yellow-400" : "text-gray-300"
+                        log.type === "error" ? "text-red-400" :
+                          log.type === "pending" ? "text-yellow-400" : "text-gray-300"
                         }`}
                     >
                       <span className="text-gray-500 text-xs">

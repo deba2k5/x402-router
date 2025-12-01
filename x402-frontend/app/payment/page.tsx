@@ -7,6 +7,7 @@ import { useAccount, useChainId, useSwitchChain, useSignTypedData } from "wagmi"
 import { baseSepolia, sepolia, arbitrumSepolia, optimismSepolia } from "viem/chains";
 import { parseUnits, type Address } from "viem";
 
+const FACILITATOR_URL = process.env.NEXT_PUBLIC_FACILITATOR_URL || "http://localhost:3000";
 const RELAYER_ADDRESS = "0x95Cf028D5e86863570E300CAD14484Dc2068eB79" as Address;
 
 // Chain configurations matching the facilitator with PaymentRouter addresses
@@ -89,7 +90,7 @@ export default function PaymentPage() {
   const handleNetworkChange = async (network: NetworkKey) => {
     setSelectedNetwork(network);
     const targetChainId = CHAIN_CONFIGS[network].chainId;
-    
+
     if (chainId !== targetChainId && isConnected) {
       try {
         await switchChain({ chainId: targetChainId });
@@ -225,7 +226,7 @@ export default function PaymentPage() {
 
       // Step 1: Verify payment with facilitator
       addLog("pending", "Verifying payment with facilitator...");
-      
+
       const verifyPayload = {
         ...paymentPayload,
         payload: {
@@ -242,7 +243,7 @@ export default function PaymentPage() {
         },
       };
 
-      const verifyResponse = await fetch("http://localhost:3000/verify", {
+      const verifyResponse = await fetch(`${FACILITATOR_URL}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paymentPayload: verifyPayload, paymentRequirements }),
@@ -259,7 +260,7 @@ export default function PaymentPage() {
       // Step 2: Settle payment
       addLog("pending", "Settling payment on-chain...");
 
-      const settleResponse = await fetch("http://localhost:3000/settle", {
+      const settleResponse = await fetch(`${FACILITATOR_URL}/settle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paymentPayload: verifyPayload, paymentRequirements }),
@@ -294,10 +295,10 @@ export default function PaymentPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 dark:from-gray-900 dark:to-gray-800">
       <Header />
-      
+
       <main className="max-w-6xl mx-auto p-8 pt-24">
         <div className="mb-8">
-          <Link 
+          <Link
             href="/"
             className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-2"
           >
@@ -460,15 +461,14 @@ export default function PaymentPage() {
                   {logs.map((log, index) => (
                     <div
                       key={index}
-                      className={`flex items-start gap-2 ${
-                        log.type === "success"
+                      className={`flex items-start gap-2 ${log.type === "success"
                           ? "text-green-400"
                           : log.type === "error"
-                          ? "text-red-400"
-                          : log.type === "pending"
-                          ? "text-yellow-400"
-                          : "text-gray-300"
-                      }`}
+                            ? "text-red-400"
+                            : log.type === "pending"
+                              ? "text-yellow-400"
+                              : "text-gray-300"
+                        }`}
                     >
                       <span className="text-gray-500 text-xs">
                         {log.timestamp.toLocaleTimeString()}
@@ -497,7 +497,7 @@ export default function PaymentPage() {
                   <p><strong>Network:</strong> {paymentResult.network}</p>
                   <p className="break-all">
                     <strong>TX Hash:</strong>{" "}
-                    <a 
+                    <a
                       href={`https://sepolia.basescan.org/tx/${paymentResult.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -528,11 +528,10 @@ export default function PaymentPage() {
           {Object.entries(CHAIN_CONFIGS).map(([key, config]) => (
             <div
               key={key}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                selectedNetwork === key
+              className={`p-4 rounded-lg border-2 transition-all ${selectedNetwork === key
                   ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
                   : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-              }`}
+                }`}
             >
               <h4 className="font-semibold text-gray-900 dark:text-white">{config.name}</h4>
               <p className="text-sm text-gray-500 dark:text-gray-400">
