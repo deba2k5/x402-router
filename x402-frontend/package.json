@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
@@ -26,5 +26,21 @@
     "eslint-config-next": "16.0.5",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "browser": {
+    "pino": "./lib/pino-browser.ts",
+    "pino/pino": "./lib/pino-browser.ts",
+    "pino/lib/transport": "./lib/pino-browser.ts",
+    "pino/*": "./lib/pino-browser.ts",
+    "thread-stream": false,
+    "thread-stream/*": false,
+    "sonic-boom": false,
+    "pino-abstract-transport": false,
+    "pino-pretty": false,
+    "tap": false,
+    "tape": false,
+    "desm": false,
+    "fastbench": false,
+    "why-is-node-running": false
   }
 }
