@@ -21,7 +21,9 @@ const PAYMENT_ROUTER_ADDRESSES = {
 };
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['X-PAYMENT-RESPONSE']
+}));
 app.use(express.json());
 
 // ============ X402 Payment Configuration ============
@@ -221,6 +223,10 @@ const requirePayment = (service) => async (req, res, next) => {
       paymentId: verifyResponse.data.paymentId,
       txHash: settleResponse.data.txHash,
       network: settleResponse.data.network,
+      bridgeTxHash: settleResponse.data.bridgeTxHash,
+      bridgeNetwork: settleResponse.data.bridgeNetwork,
+      relayerTxHash: settleResponse.data.relayerTxHash,
+      relayerNetwork: settleResponse.data.relayerNetwork,
     };
 
     // Set response header with payment confirmation

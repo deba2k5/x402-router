@@ -181,6 +181,25 @@ const SIMPLE_BRIDGE_ABI = [
     ],
     outputs: [],
   },
+  {
+    name: "processedBridges",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "bridgeId", type: "bytes32" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    name: "BridgeCompleted",
+    type: "event",
+    inputs: [
+      { name: "bridgeId", type: "bytes32", indexed: true },
+      { name: "token", type: "address", indexed: false },
+      { name: "recipient", type: "address", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
 ] as const;
 
 // ERC20 ABI for approval
@@ -650,6 +669,79 @@ const bridgeViaContract = async (
   }
 };
 
+/**
+ * Check if bridge has been completed by relayer on destination chain
+ */
+const checkBridgeCompletion = async (
+  bridgeId: string,
+  destChainId: number,
+  maxWaitSeconds: number = 5
+): Promise<{ completed: boolean; txHash?: string }> => {
+  try {
+    const destConfig = Object.values(CHAIN_CONFIGS).find(c => c.chainId === destChainId);
+    if (!destConfig) {
+      return { completed: false };
+    }
+
+    const bridgeAddress = BRIDGE_ADDRESSES[destChainId];
+    if (!bridgeAddress) {
+      return { completed: false };
+    }
+
+    const publicClient = createPublicClient({
+      chain: destConfig.chain,
+      transport: http(destConfig.rpcUrl),
+    });
+
+    // Wait for the specified time
+    await new Promise(resolve => setTimeout(resolve, maxWaitSeconds * 1000));
+
+    // Check if bridge has been processed
+    const isProcessed = await publicClient.readContract({
+      address: bridgeAddress,
+      abi: SIMPLE_BRIDGE_ABI as any,
+      functionName: 'processedBridges',
+      args: [bridgeId as Hex],
+    });
+
+    if (!isProcessed) {
+      return { completed: false };
+    }
+
+    // Get recent BridgeCompleted events to find the transaction hash
+    const currentBlock = await publicClient.getBlockNumber();
+    const fromBlock = currentBlock - BigInt(100); // Look back 100 blocks
+
+    const logs = await publicClient.getLogs({
+      address: bridgeAddress,
+      event: {
+        name: 'BridgeCompleted',
+        type: 'event',
+        inputs: [
+          { name: 'bridgeId', type: 'bytes32', indexed: true },
+          { name: 'token', type: 'address', indexed: false },
+          { name: 'recipient', type: 'address', indexed: false },
+          { name: 'amount', type: 'uint256', indexed: false },
+        ],
+      },
+      args: {
+        bridgeId: bridgeId as Hex,
+      },
+      fromBlock,
+      toBlock: currentBlock,
+    });
+
+    if (logs.length > 0 && logs[0]?.transactionHash) {
+      return { completed: true, txHash: logs[0].transactionHash };
+    }
+
+    return { completed: true }; // Processed but couldn't find event
+  } catch (error) {
+    console.error(`[BRIDGE CHECK] Error checking bridge completion:`, error);
+    return { completed: false };
+  }
+};
+
 // ============ Express App ============
 const app = express();
 
@@ -691,6 +783,10 @@ type SettleResponse = {
   txHash?: string;
   network?: string;
   error?: string;
+  bridgeTxHash?: string;
+  bridgeNetwork?: string;
+  relayerTxHash?: string;
+  relayerNetwork?: string;
 };
 
 // ============ API Endpoints ============
@@ -882,16 +978,34 @@ app.post("/settle", async (req: Request, res: Response) => {
       console.log(`  Network: ${record.routePlan.chainConfig.name} `);
 
       // If cross-chain, simulate bridge
+      let bridgeTxHash: string | undefined;
+      let relayerTxHash: string | undefined;
       if (record.routePlan.bridgeRequired && record.routePlan.destinationChainConfig) {
         console.log(`[SETTLE] Cross-chain payment detected - Would bridge to ${record.routePlan.destinationChainConfig.name}`);
-        const bridgeTx = `0x${crypto.randomBytes(32).toString("hex")}`;
-        console.log(`[SETTLE] Bridge TxHash(demo): ${bridgeTx}`);
+        bridgeTxHash = `0x${crypto.randomBytes(32).toString("hex")}`;
+        const bridgeId = `0x${crypto.randomBytes(32).toString("hex")}`;
+        console.log(`[SETTLE] Bridge TxHash(demo): ${bridgeTxHash}`);
+        console.log(`[SETTLE] Bridge ID(demo): ${bridgeId}`);
+
+        // Simulate relayer completion check
+        console.log(`[SETTLE] Waiting 5 seconds to check for relayer completion...`);
+        const completion = await checkBridgeCompletion(bridgeId, record.routePlan.destinationChainConfig.chainId, 5);
+        if (completion.completed && completion.txHash) {
+          relayerTxHash = completion.txHash;
+          console.log(`[SETTLE] Relayer completed bridge: ${relayerTxHash}`);
+        } else {
+          console.log(`[SETTLE] Relayer has not completed bridge yet`);
+        }
       }
 
       const response: SettleResponse = {
         success: true,
         txHash: demoTxHash,
         network: record.routePlan.chainConfig.name,
+        bridgeTxHash,
+        bridgeNetwork: record.routePlan.destinationChainConfig?.name,
+        relayerTxHash,
+        relayerNetwork: record.routePlan.destinationChainConfig?.name,
       };
       res.json(response);
       return;
@@ -909,6 +1023,8 @@ app.post("/settle", async (req: Request, res: Response) => {
       console.log(`  Network: ${record.routePlan.chainConfig.name} `);
 
       // If cross-chain, initiate bridge
+      let bridgeTxHash: string | undefined;
+      let relayerTxHash: string | undefined;
       if (record.routePlan.bridgeRequired && record.routePlan.destinationChainConfig) {
         console.log(`[SETTLE] Initiating cross-chain bridge to ${record.routePlan.destinationChainConfig.name}...`);
 
@@ -926,7 +1042,18 @@ app.post("/settle", async (req: Request, res: Response) => {
         );
 
         if (bridgeResult.success) {
-          console.log(`[SETTLE] Bridge initiated successfully: ${bridgeResult.bridgeTxHash}`);
+          bridgeTxHash = bridgeResult.bridgeTxHash;
+          console.log(`[SETTLE] Bridge initiated successfully: ${bridgeTxHash}`);
+
+          // Wait and check if relayer has completed the bridge
+          console.log(`[SETTLE] Waiting 5 seconds to check for relayer completion...`);
+          const completion = await checkBridgeCompletion(bridgeId, record.routePlan.destinationChainConfig.chainId, 5);
+          if (completion.completed && completion.txHash) {
+            relayerTxHash = completion.txHash;
+            console.log(`[SETTLE] Relayer completed bridge: ${relayerTxHash}`);
+          } else {
+            console.log(`[SETTLE] Relayer has not completed bridge yet`);
+          }
         } else {
           console.warn(`[SETTLE] Bridge failed: ${bridgeResult.error}`);
         }
@@ -936,6 +1063,10 @@ app.post("/settle", async (req: Request, res: Response) => {
         success: true,
         txHash: result.txHash,
         network: record.routePlan.chainConfig.name,
+        bridgeTxHash,
+        bridgeNetwork: record.routePlan.destinationChainConfig?.name,
+        relayerTxHash,
+        relayerNetwork: record.routePlan.destinationChainConfig?.name,
       };
       res.json(response);
     } else {

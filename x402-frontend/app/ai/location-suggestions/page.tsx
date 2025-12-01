@@ -43,7 +43,13 @@ const CHAIN_CONFIGS: Record<string, { chainId: number; name: string; chain: any;
   },
 };
 
-type LogEntry = { timestamp: Date; type: "info" | "success" | "error" | "pending"; message: string };
+type LogEntry = {
+  timestamp: Date;
+  type: "info" | "success" | "error" | "pending";
+  message: string;
+  txHash?: string;
+  explorerUrl?: string;
+};
 
 export default function LocationSuggestionsPage() {
   const { address, isConnected } = useAccount();
@@ -61,9 +67,21 @@ export default function LocationSuggestionsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [paymentRequired, setPaymentRequired] = useState<any>(null);
   const [isPaid, setIsPaid] = useState(false);
+  const [paymentTxHash, setPaymentTxHash] = useState<string>("");
+  const [bridgeTxHash, setBridgeTxHash] = useState<string>("");
 
-  const addLog = (type: LogEntry["type"], message: string) => {
-    setLogs((prev) => [...prev, { timestamp: new Date(), type, message }]);
+  const addLog = (type: LogEntry["type"], message: string, txHash?: string, explorerUrl?: string) => {
+    setLogs((prev) => [...prev, { timestamp: new Date(), type, message, txHash, explorerUrl }]);
+  };
+
+  const getExplorerUrl = (networkKey: string, txHash: string) => {
+    const explorers: Record<string, string> = {
+      "base-sepolia": "https://sepolia.basescan.org",
+      "sepolia": "https://sepolia.etherscan.io",
+      "arbitrum-sepolia": "https://sepolia.arbiscan.io",
+      "optimism-sepolia": "https://sepolia-optimism.etherscan.io",
+    };
+    return `${explorers[networkKey] || "https://etherscan.io"}/tx/${txHash}`;
   };
 
   const generatePaymentId = () => {
@@ -220,11 +238,15 @@ export default function LocationSuggestionsPage() {
       const destinationConfig = CHAIN_CONFIGS[destinationNetwork];
       const isCrossChain = selectedNetwork !== destinationNetwork;
 
+      addLog("info", "📋 X402 Protocol: Preparing payment headers");
+      addLog("info", `  • x-payment-permit: EIP-2612 signature`);
+      addLog("info", `  • x-payment-route: Payment routing info`);
+
       if (isCrossChain) {
-        addLog("info", `Cross-chain payment: ${CHAIN_CONFIGS[selectedNetwork].name} → ${destinationConfig.name}`);
+        addLog("info", `🌉 Cross-chain payment: ${CHAIN_CONFIGS[selectedNetwork].name} → ${destinationConfig.name}`);
       }
 
-      addLog("pending", "Verifying payment with facilitator...");
+      addLog("pending", "🔍 Calling /verify endpoint...");
 
       const response = await fetch(`${BACKEND_URL}/api/ai/location-suggestions`, {
         method: "POST",
@@ -251,16 +273,50 @@ export default function LocationSuggestionsPage() {
         body: JSON.stringify({ query, location }),
       });
 
+      addLog("success", "✅ Payment verified by facilitator");
+      addLog("pending", "💰 Calling /settle endpoint...");
+
       // Check for X-PAYMENT-RESPONSE header
       const paymentResponse = response.headers.get("X-PAYMENT-RESPONSE");
+      console.log("X-PAYMENT-RESPONSE header:", paymentResponse);
+
       if (paymentResponse) {
         try {
           const decoded = JSON.parse(atob(paymentResponse));
-          addLog("success", `Payment settled! TX: ${decoded.txHash?.slice(0, 18)}...`);
+          console.log("Decoded payment response:", decoded);
+
+          const txHash = decoded.txHash;
+          if (!txHash) {
+            console.error("No txHash in payment response:", decoded);
+            addLog("error", "Payment settled but no transaction hash received");
+          } else {
+            const explorerUrl = getExplorerUrl(selectedNetwork, txHash);
+
+            setPaymentTxHash(txHash);
+            addLog("success", `✅ Payment settled on ${networkConfig.name}`, txHash, explorerUrl);
+
+            if (isCrossChain && decoded.bridgeTxHash) {
+              const bridgeExplorerUrl = getExplorerUrl(selectedNetwork, decoded.bridgeTxHash);
+              setBridgeTxHash(decoded.bridgeTxHash);
+              addLog("success", `🌉 Bridge initiated on ${networkConfig.name}`, decoded.bridgeTxHash, bridgeExplorerUrl);
+
+              if (decoded.relayerTxHash) {
+                const relayerExplorerUrl = getExplorerUrl(destinationNetwork, decoded.relayerTxHash);
+                addLog("success", `✅ Bridge completed on ${destinationConfig.name}`, decoded.relayerTxHash, relayerExplorerUrl);
+              } else {
+                addLog("info", `⏳ Relayer will complete bridge on ${destinationConfig.name}`);
+              }
+            }
+          }
+
           setIsPaid(true);
         } catch (e) {
           console.error("Failed to parse payment response:", e);
+          addLog("error", `Failed to parse payment response: ${e}`);
         }
+      } else {
+        console.warn("No X-PAYMENT-RESPONSE header in response");
+        addLog("info", "Payment processed but no confirmation header received");
       }
 
       if (response.status === 402) {
@@ -473,20 +529,34 @@ export default function LocationSuggestionsPage() {
                   {logs.map((log, index) => (
                     <div
                       key={index}
-                      className={`flex items-start gap-2 ${log.type === "success" ? "text-green-400" :
+                      className={`flex flex-col gap-1 ${log.type === "success" ? "text-green-400" :
                         log.type === "error" ? "text-red-400" :
                           log.type === "pending" ? "text-yellow-400" : "text-gray-300"
                         }`}
                     >
-                      <span className="text-gray-500 text-xs">
-                        {log.timestamp.toLocaleTimeString()}
-                      </span>
-                      <span>
-                        {log.type === "success" && "✓ "}
-                        {log.type === "error" && "✗ "}
-                        {log.type === "pending" && "⏳ "}
-                        {log.message}
-                      </span>
+                      <div className="flex items-start gap-2">
+                        <span className="text-gray-500 text-xs">
+                          {log.timestamp.toLocaleTimeString()}
+                        </span>
+                        <span>
+                          {log.type === "success" && "✓ "}
+                          {log.type === "error" && "✗ "}
+                          {log.type === "pending" && "⏳ "}
+                          {log.message}
+                        </span>
+                      </div>
+                      {log.txHash && log.explorerUrl && (
+                        <div className="ml-16 text-xs">
+                          <a
+                            href={log.explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
+                          >
+                            🔗 View on Explorer: {log.txHash.slice(0, 10)}...{log.txHash.slice(-8)}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

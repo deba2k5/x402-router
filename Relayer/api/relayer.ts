@@ -222,13 +222,25 @@ async function listenForBridgeInitiated(sourceChainId: number) {
   // Load or initialize last block checked from file
   const stateFile = path.join(import.meta.dir, `.relayer-state-${sourceChainId}.json`);
   let lastBlockChecked = 0n;
-  
+
   if (fs.existsSync(stateFile)) {
     try {
       const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
       lastBlockChecked = BigInt(state.lastBlockChecked || 0);
     } catch (e) {
-      // File corrupted or doesn't exist, start from 0
+      // File corrupted or doesn't exist, start from recent blocks
+    }
+  }
+
+  // If starting fresh, scan last 1000 blocks instead of starting from current
+  if (lastBlockChecked === 0n) {
+    try {
+      const currentBlock = await publicClient.getBlockNumber();
+      const lookbackBlocks = BigInt(process.env.RELAYER_LOOKBACK_BLOCKS || '1000');
+      lastBlockChecked = currentBlock > lookbackBlocks ? currentBlock - lookbackBlocks : 0n;
+      console.log(`   Starting from block ${lastBlockChecked} (${lookbackBlocks} blocks ago)`);
+    } catch (e) {
+      console.warn(`   Could not get current block, starting from 0`);
     }
   }
 
@@ -300,12 +312,12 @@ async function listenForBridgeInitiated(sourceChainId: number) {
 
               // Track this bridge
               const key = String(bridgeId);
-              
+
               // Skip if already completed or being processed
               if (completedBridges.has(key)) {
                 continue;
               }
-              
+
               const existing = pendingBridges.get(key);
               if (existing && (existing.status === 'processing' || existing.status === 'completed')) {
                 continue;
@@ -341,11 +353,11 @@ async function listenForBridgeInitiated(sourceChainId: number) {
 
           } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            
+
             // Check if it's a rate limit or block range error
             if (errorMsg.includes('429') || errorMsg.includes('rate') || errorMsg.includes('exceeded')) {
               console.warn(`⚠️  Rate limited on ${sourceConfig.name}: ${errorMsg}`);
-              
+
               // Exponential backoff
               state.retries = Math.min(state.retries + 1, RATE_LIMIT_CONFIG.maxRetries);
               const delayMs = Math.min(
@@ -373,7 +385,7 @@ async function listenForBridgeInitiated(sourceChainId: number) {
         }
 
         lastBlockChecked = currentBlock;
-        
+
         // Save state to file
         try {
           fs.writeFileSync(stateFile, JSON.stringify({ lastBlockChecked: lastBlockChecked.toString() }));
@@ -383,7 +395,7 @@ async function listenForBridgeInitiated(sourceChainId: number) {
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      
+
       if (errorMsg.includes('429') || errorMsg.includes('rate')) {
         console.warn(`⚠️  Rate limited on ${sourceConfig.name}`);
         const state = chainRateLimitState[sourceChainId];
@@ -436,7 +448,7 @@ async function processBridge(bridgeKey: string) {
     const sourceTokenLower = bridge.token.toLowerCase();
     const destTokenMapping = TOKEN_ADDRESS_MAPPING[sourceTokenLower];
     const destToken = destTokenMapping?.[bridge.destChainId] || bridge.token;
-    
+
     if (destToken.toLowerCase() !== bridge.token.toLowerCase()) {
       console.log(`   🔄 Token mapping: ${bridge.token} -> ${destToken}`);
     }
@@ -523,7 +535,7 @@ async function processBridge(bridgeKey: string) {
         const decodedErr = decodeErrorResult({ abi: SIMPLE_BRIDGE_ABI as any, data: error.data });
         decoded = ` | decoded: ${decodedErr?.errorName || ''}`;
       }
-    } catch {}
+    } catch { }
     const errData = error?.data ? ` | data: ${error.data}` : '';
 
     // Check for BridgeAlreadyProcessed error (0xf6bc998c)
@@ -535,7 +547,7 @@ async function processBridge(bridgeKey: string) {
     }
 
     console.error(`   ❌ Error completing bridge: ${errMsg}${errData}${decoded}`);
-    
+
     // Check for common issues
     if (errMsg.includes('insufficient funds') || errMsg.includes('balance') || errMsg.includes('TransferFailed')) {
       console.error(`   💡 Bridge contract may not have enough tokens on ${destConfig.name}`);
@@ -546,7 +558,7 @@ async function processBridge(bridgeKey: string) {
     } else if (errMsg.includes('InvalidAmount')) {
       console.error(`   💡 Invalid amount or recipient address`);
     }
-    
+
     bridge.status = 'failed';
     bridge.error = errMsg;
 
@@ -610,13 +622,13 @@ function getStatus() {
 
 async function main() {
   console.log('\n🌉 SimpleBridge Relayer Service\n');
-  
+
   // Show configuration
   const blockChunkSize = process.env.RELAYER_BLOCK_CHUNK_SIZE || '10';
   console.log('⚙️  Configuration:');
   console.log(`   Block chunk size: ${blockChunkSize} blocks`);
   console.log(`   Relayer address: ${RELAYER_ACCOUNT.address}\n`);
-  
+
   console.log('Listening for BridgeInitiated events on all chains...\n');
 
   // Start listening on all source chains
