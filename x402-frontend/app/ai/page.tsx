@@ -24,11 +24,7 @@ export default function AIPage() {
 
           {/* Header */}
           <div className="text-center max-w-4xl mx-auto mb-20">
-            <div className="inline-block mb-4">
-              <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full text-sm font-bold tracking-wide">
-                PREMIUM AI SERVICES
-              </span>
-            </div>
+
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-gray-900 mb-6 tracking-tight">
               Choose Your
               <br />
@@ -87,11 +83,18 @@ export default function AIPage() {
                     <div className="text-3xl font-black text-gray-900">1 USDC</div>
                     <div className="text-sm text-gray-500 font-medium">per generation</div>
                   </div>
-                  <div className="flex items-center gap-2 text-indigo-600 font-bold text-lg group-hover:gap-4 transition-all">
-                    <span>Generate</span>
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
+                  <div className="relative">
+                    {/* Animated gradient border */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl opacity-75 blur group-hover:opacity-100 animate-pulse"></div>
+                    <div className="relative bg-white px-6 py-3 rounded-xl border-2 border-transparent bg-clip-padding">
+                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity -z-10"></div>
+                      <div className="flex items-center gap-2 text-indigo-600 group-hover:text-white font-bold text-lg group-hover:gap-4 transition-all relative z-10">
+                        <span>Generate</span>
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -147,11 +150,18 @@ export default function AIPage() {
                     <div className="text-3xl font-black text-gray-900">1 USDC</div>
                     <div className="text-sm text-gray-500 font-medium">per request</div>
                   </div>
-                  <div className="flex items-center gap-2 text-emerald-600 font-bold text-lg group-hover:gap-4 transition-all">
-                    <span>Discover</span>
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
+                  <div className="relative">
+                    {/* Animated gradient border */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-xl opacity-75 blur group-hover:opacity-100 animate-pulse"></div>
+                    <div className="relative bg-white px-6 py-3 rounded-xl border-2 border-transparent bg-clip-padding">
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity -z-10"></div>
+                      <div className="flex items-center gap-2 text-emerald-600 group-hover:text-white font-bold text-lg group-hover:gap-4 transition-all relative z-10">
+                        <span>Discover</span>
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
