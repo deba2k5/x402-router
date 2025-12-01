@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bun run --watch api/relayer.ts",
     "start": "bun run api/relayer.ts",
-    "build": "bun build api/relayer.ts --outfile dist/relayer.js"
+    "build": "bun build api/relayer.ts --outfile dist/relayer.js && mkdir -p public && echo 'Relayer API' > public/index.html"
   },
   "dependencies": {
     "viem": "^2.40.3",

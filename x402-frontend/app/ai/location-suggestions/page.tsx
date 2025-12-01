@@ -13,33 +13,33 @@ const RELAYER_ADDRESS = "0x95Cf028D5e86863570E300CAD14484Dc2068eB79" as Address;
 
 // Chain configurations with deployed PaymentRouter and token addresses
 const CHAIN_CONFIGS: Record<string, { chainId: number; name: string; chain: any; paymentRouter: Address; usdc: Address }> = {
-  "base-sepolia": { 
-    chainId: 84532, 
-    name: "Base Sepolia", 
-    chain: baseSepolia, 
+  "base-sepolia": {
+    chainId: 84532,
+    name: "Base Sepolia",
+    chain: baseSepolia,
     paymentRouter: "0x12B57C8615aD34469e1388F1CEb700F8f416BC80" as Address,
-    usdc: "0x2b23c6e36b46cC013158Bc2869D686023FA85422" as Address 
+    usdc: "0x2b23c6e36b46cC013158Bc2869D686023FA85422" as Address
   },
-  "sepolia": { 
-    chainId: 11155111, 
-    name: "Sepolia", 
-    chain: sepolia, 
+  "sepolia": {
+    chainId: 11155111,
+    name: "Sepolia",
+    chain: sepolia,
     paymentRouter: "0xAf83302a062bDEfC42e12d09E7Dd3e4374998F70" as Address,
-    usdc: "0xc505D038fe2901fe624E6450887373BaA29e455F" as Address 
+    usdc: "0xc505D038fe2901fe624E6450887373BaA29e455F" as Address
   },
-  "arbitrum-sepolia": { 
-    chainId: 421614, 
-    name: "Arbitrum Sepolia", 
-    chain: arbitrumSepolia, 
+  "arbitrum-sepolia": {
+    chainId: 421614,
+    name: "Arbitrum Sepolia",
+    chain: arbitrumSepolia,
     paymentRouter: "0xC49568398F909aF8D40Cf27B26780e1B5Ca5996F" as Address,
-    usdc: "0x7b926C6038a23c3E26F7f36DcBec7606BAF44434" as Address 
+    usdc: "0x7b926C6038a23c3E26F7f36DcBec7606BAF44434" as Address
   },
-  "optimism-sepolia": { 
-    chainId: 11155420, 
-    name: "Optimism Sepolia", 
-    chain: optimismSepolia, 
+  "optimism-sepolia": {
+    chainId: 11155420,
+    name: "Optimism Sepolia",
+    chain: optimismSepolia,
     paymentRouter: "0xeeC4119F3B69A61744073BdaEd83421F4b29961E" as Address,
-    usdc: "0x281Ae468d00040BCbB4685972F51f87d473420F7" as Address 
+    usdc: "0x281Ae468d00040BCbB4685972F51f87d473420F7" as Address
   },
 };
 
@@ -123,13 +123,46 @@ export default function LocationSuggestionsPage() {
       addLog("info", `Starting X402 Payment Flow`);
       addLog("info", `Network: ${networkConfig.name}`);
       addLog("info", `Amount: 0.5 USDC`);
+      addLog("info", `User Address: ${address}`);
+      addLog("info", `PaymentRouter (Spender): ${paymentRouterAddress}`);
 
       // Switch chain if needed
       if (chainId !== networkConfig.chainId) {
         addLog("pending", "Switching network...");
         await switchChain({ chainId: networkConfig.chainId });
+
+        // Wait for wallet to update state
+        addLog("pending", "Waiting for network switch...");
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
         addLog("success", `Switched to ${networkConfig.name}`);
       }
+
+      // Fetch current nonce from Token contract
+      addLog("pending", `Fetching USDC permit nonce...`);
+
+      const { createPublicClient, http } = await import('viem');
+      const publicClient = createPublicClient({
+        chain: networkConfig.chain,
+        transport: http(),
+      });
+
+      const currentNonce = await publicClient.readContract({
+        address: networkConfig.usdc,
+        abi: [
+          {
+            name: 'nonces',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'owner', type: 'address' }],
+            outputs: [{ name: '', type: 'uint256' }],
+          },
+        ],
+        functionName: 'nonces',
+        args: [address],
+      });
+
+      addLog("success", `Current nonce: ${currentNonce}`);
 
       // Sign permit
       addLog("pending", "Requesting signature...");
@@ -155,7 +188,7 @@ export default function LocationSuggestionsPage() {
         owner: address,
         spender: paymentRouterAddress as Address,
         value: BigInt(amount),
-        nonce: BigInt(0),
+        nonce: currentNonce,
         deadline: BigInt(deadline),
       };
 
@@ -187,7 +220,11 @@ export default function LocationSuggestionsPage() {
       const destinationConfig = CHAIN_CONFIGS[destinationNetwork];
       const isCrossChain = selectedNetwork !== destinationNetwork;
 
-      addLog("pending", "Verifying payment...");
+      if (isCrossChain) {
+        addLog("info", `Cross-chain payment: ${CHAIN_CONFIGS[selectedNetwork].name} → ${destinationConfig.name}`);
+      }
+
+      addLog("pending", "Verifying payment with facilitator...");
 
       const response = await fetch(`${BACKEND_URL}/api/ai/location-suggestions`, {
         method: "POST",
@@ -217,28 +254,52 @@ export default function LocationSuggestionsPage() {
       // Check for X-PAYMENT-RESPONSE header
       const paymentResponse = response.headers.get("X-PAYMENT-RESPONSE");
       if (paymentResponse) {
-        const decoded = JSON.parse(atob(paymentResponse));
-        addLog("success", `Payment settled! TX: ${decoded.txHash?.slice(0, 18)}...`);
-        setIsPaid(true);
+        try {
+          const decoded = JSON.parse(atob(paymentResponse));
+          addLog("success", `Payment settled! TX: ${decoded.txHash?.slice(0, 18)}...`);
+          setIsPaid(true);
+        } catch (e) {
+          console.error("Failed to parse payment response:", e);
+        }
       }
 
       if (response.status === 402) {
-        const data = await response.json();
-        addLog("error", `Payment required: ${data.reason || data.message}`);
-        throw new Error(data.reason || "Payment required");
+        try {
+          const data = await response.json();
+          addLog("error", `Payment required: ${data.reason || data.message}`);
+          throw new Error(data.reason || "Payment required");
+        } catch (e) {
+          addLog("error", "Payment required but response format invalid");
+          throw new Error("Payment required");
+        }
       }
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to get suggestions");
+        try {
+          const data = await response.json();
+          throw new Error(data.error || "Failed to get suggestions");
+        } catch (e) {
+          addLog("error", "Server error - please try again");
+          throw new Error("Server error - please try again");
+        }
       }
 
-      const data = await response.json();
-      addLog("success", "Suggestions generated successfully!");
-      setResult(data);
+      try {
+        const data = await response.json();
+        addLog("success", "Suggestions generated successfully!");
+        setResult(data);
+      } catch (e) {
+        addLog("error", "Failed to parse server response");
+        throw new Error("Failed to parse server response");
+      }
     } catch (err: any) {
-      addLog("error", err.message);
-      setError(err.message || "An error occurred");
+      // Filter out the ugly JSON parsing error messages
+      const errorMessage = err.message.includes("Unexpected token")
+        ? "Processing payment - please wait a moment and try again"
+        : err.message || "An error occurred";
+
+      addLog("error", errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -247,10 +308,10 @@ export default function LocationSuggestionsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
       <Header />
-      
+
       <div className="max-w-6xl mx-auto p-8 pt-24">
         <div className="mb-8">
-          <Link 
+          <Link
             href="/ai"
             className="text-green-600 hover:text-green-800 dark:text-green-400 flex items-center gap-2"
           >
@@ -412,11 +473,10 @@ export default function LocationSuggestionsPage() {
                   {logs.map((log, index) => (
                     <div
                       key={index}
-                      className={`flex items-start gap-2 ${
-                        log.type === "success" ? "text-green-400" :
-                        log.type === "error" ? "text-red-400" :
-                        log.type === "pending" ? "text-yellow-400" : "text-gray-300"
-                      }`}
+                      className={`flex items-start gap-2 ${log.type === "success" ? "text-green-400" :
+                          log.type === "error" ? "text-red-400" :
+                            log.type === "pending" ? "text-yellow-400" : "text-gray-300"
+                        }`}
                     >
                       <span className="text-gray-500 text-xs">
                         {log.timestamp.toLocaleTimeString()}
