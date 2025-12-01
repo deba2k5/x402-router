@@ -5,94 +5,186 @@ import Header from "../components/Header";
 
 export default function AIPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-white">
       <Header />
-      
-      <div className="max-w-6xl mx-auto p-8 pt-24">
-        <div className="mb-8">
-          <Link 
+
+      <main className="pt-24 pb-20">
+        {/* Hero Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Back Button */}
+          <Link
             href="/"
-            className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-2"
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-indigo-600 mb-12 transition-colors group font-medium"
           >
-            ← Back to Home
+            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Home
           </Link>
-        </div>
 
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-4">
-            Choose Your AI Experience
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
-            Select the AI service you want to use
-          </p>
-        </div>
+          {/* Header */}
+          <div className="text-center max-w-4xl mx-auto mb-20">
+            <div className="inline-block mb-4">
+              <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full text-sm font-bold tracking-wide">
+                PREMIUM AI SERVICES
+              </span>
+            </div>
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-gray-900 mb-6 tracking-tight">
+              Choose Your
+              <br />
+              <span className="text-indigo-600">AI Experience</span>
+            </h1>
+            <p className="text-xl text-gray-600 leading-relaxed">
+              Select from our suite of AI-powered services. Pay securely with cryptocurrency across multiple blockchains.
+            </p>
+          </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* AI Image Generation Card */}
-          <Link href="/ai/image-generation">
-            <div className="group bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all transform hover:scale-105 cursor-pointer border-2 border-transparent hover:border-indigo-500">
-              <div className="text-6xl mb-6 text-center">🎨</div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 text-center">
-                AI Image Generation
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300 mb-6 text-center">
-                Create stunning images from text descriptions using GROQ Llama 3.3 70B AI
-              </p>
-              <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>Text-to-Image generation</span>
+          {/* Service Cards Grid */}
+          <div className="grid lg:grid-cols-2 gap-8 mb-20">
+            {/* AI Image Generation Card */}
+            <Link href="/ai/image-generation" className="group block">
+              <div className="relative bg-white rounded-3xl border-2 border-gray-200 p-10 hover:border-indigo-500 hover:shadow-2xl hover:shadow-indigo-100 transition-all duration-300 h-full">
+                {/* Top Section */}
+                <div className="flex items-start justify-between mb-8">
+                  <div className="flex-1">
+                    <div className="w-20 h-20 bg-indigo-100 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-indigo-600 transition-all duration-300">
+                      <svg className="w-10 h-10 text-indigo-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+
+                    <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                      AI Image Generation
+                    </h2>
+                    <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                      Transform text into stunning visuals using advanced GROQ Llama 3.3 70B AI technology.
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>Powered by GROQ Llama</span>
+
+                {/* Features */}
+                <div className="space-y-3 mb-8">
+                  {[
+                    'Text-to-Image generation',
+                    'Powered by GROQ Llama AI',
+                    'Multi-chain payment support',
+                    'Instant delivery'
+                  ].map((feature, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-700 font-medium">{feature}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>X402 Protocol enabled</span>
+
+                {/* Bottom Section */}
+                <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+                  <div>
+                    <div className="text-3xl font-black text-gray-900">1 USDC</div>
+                    <div className="text-sm text-gray-500 font-medium">per generation</div>
+                  </div>
+                  <div className="flex items-center gap-2 text-indigo-600 font-bold text-lg group-hover:gap-4 transition-all">
+                    <span>Generate</span>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </div>
                 </div>
+
+                {/* Hover Indicator */}
+                <div className="absolute top-4 right-4 w-3 h-3 bg-indigo-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </div>
-              <div className="mt-8 text-center">
-                <span className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold group-hover:bg-indigo-700">
-                  Generate Images →
-                </span>
+            </Link>
+
+            {/* Location Intelligence Card */}
+            <Link href="/ai/location-suggestions" className="group block">
+              <div className="relative bg-white rounded-3xl border-2 border-gray-200 p-10 hover:border-emerald-500 hover:shadow-2xl hover:shadow-emerald-100 transition-all duration-300 h-full">
+                {/* Top Section */}
+                <div className="flex items-start justify-between mb-8">
+                  <div className="flex-1">
+                    <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-emerald-600 transition-all duration-300">
+                      <svg className="w-10 h-10 text-emerald-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+
+                    <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                      Location Intelligence
+                    </h2>
+                    <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                      Discover amazing places with AI-powered personalized recommendations.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Features */}
+                <div className="space-y-3 mb-8">
+                  {[
+                    'Personalized recommendations',
+                    'Powered by GROQ AI',
+                    'Multi-chain payment support',
+                    'Real-time results'
+                  ].map((feature, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-700 font-medium">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bottom Section */}
+                <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+                  <div>
+                    <div className="text-3xl font-black text-gray-900">1 USDC</div>
+                    <div className="text-sm text-gray-500 font-medium">per request</div>
+                  </div>
+                  <div className="flex items-center gap-2 text-emerald-600 font-bold text-lg group-hover:gap-4 transition-all">
+                    <span>Discover</span>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Hover Indicator */}
+                <div className="absolute top-4 right-4 w-3 h-3 bg-emerald-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </div>
+            </Link>
+          </div>
+
+          {/* Info Section */}
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    Powered by X402 Multi-Chain Protocol
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    All services use <span className="font-semibold text-gray-900">GROQ Llama 3.3 AI</span> and are secured by our multi-chain payment infrastructure. Pay with any token on any supported chain: <span className="font-semibold text-gray-900">Base, Sepolia, Arbitrum, or Optimism</span>.
+                  </p>
+                </div>
               </div>
             </div>
-          </Link>
-
-          {/* Location-Based Suggestions Card */}
-          <Link href="/ai/location-suggestions">
-            <div className="group bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-all transform hover:scale-105 cursor-pointer border-2 border-transparent hover:border-green-500">
-              <div className="text-6xl mb-6 text-center">📍</div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 text-center">
-                Location Suggestions
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300 mb-6 text-center">
-                Discover amazing places based on your preferences with GROQ Llama 3.3 AI
-              </p>
-              <div className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>Personalized recommendations</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>Powered by GROQ AI</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>X402 Protocol enabled</span>
-                </div>
-              </div>
-              <div className="mt-8 text-center">
-                <span className="inline-block px-6 py-3 bg-green-600 text-white rounded-full font-semibold group-hover:bg-green-700">
-                  Find Places →
-                </span>
-              </div>
-            </div>
-          </Link>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
