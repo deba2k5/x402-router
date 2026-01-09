@@ -1,4 +1,3 @@
-Got it — since the interface didn’t expose the generated file as a downloadable link, I’ll give you **the full Markdown content directly here** so you can **copy-paste into a file** or I can recreate it again as a downloadable file if your UI supports it.
 
 
 ## **Overview**
